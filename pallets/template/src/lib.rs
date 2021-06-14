@@ -1,107 +1,198 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-/// Edit this file to define custom logic or remove it if it is not needed.
-/// Learn more about FRAME and the core library of Substrate FRAME pallets:
-/// <https://substrate.dev/docs/en/knowledgebase/runtime/frame>
 
-pub use pallet::*;
 
-#[cfg(test)]
-mod mock;
+// Imports
+// -------------------------------------------------
 
-#[cfg(test)]
-mod tests;
+use frame_support::{
+	decl_error, decl_event, decl_module, decl_storage,
+};
 
-#[cfg(feature = "runtime-benchmarks")]
-mod benchmarking;
+use sp_std::vec::Vec;
 
-#[frame_support::pallet]
-pub mod pallet {
-	use frame_support::{dispatch::DispatchResult, pallet_prelude::*};
-	use frame_system::pallet_prelude::*;
 
-	/// Configure the pallet by specifying the parameters and types on which it depends.
-	#[pallet::config]
-	pub trait Config: frame_system::Config {
-		/// Because this pallet emits events, it depends on the runtime's definition of an event.
-		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
-	}
+// Trait, types and constants used by this pallet
+// -------------------------------------------------
 
-	#[pallet::pallet]
-	#[pallet::generate_store(pub(super) trait Store)]
-	pub struct Pallet<T>(_);
+pub trait Config: frame_system::Config  {
+	type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
+}
 
-	// The pallet's runtime storage items.
-	// https://substrate.dev/docs/en/knowledgebase/runtime/storage
-	#[pallet::storage]
-	#[pallet::getter(fn something)]
-	// Learn more about declaring storage items:
-	// https://substrate.dev/docs/en/knowledgebase/runtime/storage#declaring-storage-items
-	pub type Something<T> = StorageValue<_, u32>;
 
-	// Pallets use events to inform users when important changes are made.
-	// https://substrate.dev/docs/en/knowledgebase/runtime/events
-	#[pallet::event]
-	#[pallet::metadata(T::AccountId = "AccountId")]
-	#[pallet::generate_deposit(pub(super) fn deposit_event)]
-	pub enum Event<T: Config> {
-		/// Event documentation should end with an array that provides descriptive names for event
-		/// parameters. [something, who]
-		SomethingStored(u32, T::AccountId),
-	}
 
-	// Errors inform users that something went wrong.
-	#[pallet::error]
-	pub enum Error<T> {
-		/// Error names should be descriptive.
-		NoneValue,
-		/// Errors should have helpful documentation associated with them.
-		StorageOverflow,
-	}
 
-	#[pallet::hooks]
-	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
 
-	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
-	// These functions materialize as "extrinsics", which are often compared to transactions.
-	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
-	#[pallet::call]
-	impl<T:Config> Pallet<T> {
-		/// An example dispatchable that takes a singles value as a parameter, writes the value to
-		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
-		pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
-			// Check that the extrinsic was signed and get the signer.
-			// This function will return an error if the extrinsic is not signed.
-			// https://substrate.dev/docs/en/knowledgebase/runtime/origin
-			let who = ensure_signed(origin)?;
+// Persistent data
+// -------------------------------------------------
 
-			// Update storage.
-			<Something<T>>::put(something);
+decl_storage! {
+	trait Store for Module<T: Config> as Owners {
+		// Total number of URLs registered
+		UrlCount: u128 = 0 ;
 
-			// Emit an event.
-			Self::deposit_event(Event::SomethingStored(something, who));
-			// Return a successful DispatchResultWithPostInfo
-			Ok(())
-		}
+		// Price for one URL check
+    	RequestPrice: u128 = 5_000_000_000_000;
 
-		/// An example dispatchable that may throw a custom error.
-		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1))]
-		pub fn cause_error(origin: OriginFor<T>) -> DispatchResult {
-			let _who = ensure_signed(origin)?;
+    	// Number of blocks after the request
+    	// during which commits are allowed
+    	NumBlocksToCommit: u8 = 5 ;
 
-			// Read a value from storage.
-			match <Something<T>>::get() {
-				// Return an error if the value has not been set.
-				None => Err(Error::<T>::NoneValue)?,
-				Some(old) => {
-					// Increment the value read from storage; will error in the event of overflow.
-					let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-					// Update the value in storage with the incremented result.
-					<Something<T>>::put(new);
-					Ok(())
-				},
-			}
-		}
+    	// Number of blocks after the end of commits
+    	// during which reveals are allowed
+    	NumBlocksToReveal: u8 = 5 ;
+
+		// Number of blocks after the end of reveals
+    	// during which request data is persisted
+    	// After this time, requests, commits and reveals
+    	// are deleted
+    	NumBlocksToDelete: u8 = 5 ;
+
+    	// Registered verifiers
+    	// 1. Block at which they were registered
+    	// 2. Enabled true/false
+    	// 2. Array of stats in following order
+    	//stats[0]: number of commits
+		//stats[1]: total blocks waited to commit
+		//stats[2]: number of reveals
+		//stats[3]: total blocks waited to reveal, after commits were closed
+		//stats[4]: number of valid reveals
+		//stats[5]: number of YES votes
+		//stats[6]: number of NO votes
+		//stats[7]: number of votes against the majority
+    	Verifiers: map hasher(identity) T::AccountId => (T::BlockNumber, bool, [u32; 8]) ;
+
+    	// List of requests received by block
+    	History: map hasher(identity) T::BlockNumber => Vec<Vec<u8>> ;
+
+    	// Request data:
+    	// - Block number
+    	// - Account
+    	Requests: map hasher(blake2_128_concat) Vec<u8> => (T::BlockNumber, T::AccountId) ;
+
+    	// Commit data
+    	// Should be the keccak_256 of the concatenation
+    	// of the params that will be sent to reveal
+    	// separated by commas
+    	// example: "0,xxx,yyy,zzz"
+    	Commits: double_map hasher(blake2_128_concat) Vec<u8>, hasher(identity) T::AccountId => [u8; 32] ;
+
+    	// Reveal data
+    	// - Vote Yes or No
+    	// - keccak_256 of the first 128 characters of the webpage
+    	// - keccak_256 of the 128 characters containing the mark
+    	Reveals: double_map hasher(blake2_128_concat) Vec<u8>, hasher(identity) T::AccountId => (bool, [u8; 32], [u8; 32]) ;
+
+    	// Final URL-Account map representing ownership
+    	Authors: map hasher(blake2_128_concat) Vec<u8> => T::AccountId ;
 	}
 }
+
+
+
+
+
+
+
+// Events
+// -------------------------------------------------
+
+decl_event!(
+	/// Events generated by the module.
+	pub enum Event<T>
+	where
+		AccountId = <T as frame_system::Config>::AccountId,
+	{
+		VerifierAdded(AccountId),
+    	VerifierEnabled(AccountId),
+    	VerifierDisabled(AccountId),
+        UrlCheckRequested(AccountId, Vec<u8>),
+        UrlCheckCommitted(AccountId, Vec<u8>),
+        UrlCheckRevealed(AccountId, Vec<u8>),
+	}
+);
+
+
+
+
+// Errors
+// -------------------------------------------------
+
+decl_error! {
+	pub enum Error for Module<T: Config> {
+        // 0
+        UrlTooLong,
+
+        // 1
+        NotEnoughBalanceToRequestUrlCheck,
+
+        // 2
+        UrlCheckAlreadyInQueue,
+
+        // 3
+        UrlCheckNotFound,
+
+        // 4
+        OffTimeToCommit,
+
+        // 5
+        OffTimeToReveal,
+
+        // 6
+        ExpectedHashWith32Bytes,
+
+        // 7
+        InvalidProofOfOwnership,
+
+        // 8
+        MismatchBetweenCommitAndReveal,
+
+        // 9
+        VerifierAlreadyRegistered,
+
+        // 10
+        VerifierNotRegistered,
+
+        // 11
+        OffchainSignedTxError,
+
+        // 12
+        NoLocalAcctForSigning,
+
+        // 13
+        InvalidSalt
+	}
+}
+
+
+
+
+
+
+// Implementation
+// -------------------------------------------------
+
+
+
+decl_module! {
+	pub struct Module<T: Config> for enum Call where origin: T::Origin {
+
+		fn deposit_event() = default;
+
+		// Test Tx
+        #[weight = 10_000]
+        fn test_tx(origin, number:u64) {
+
+        }
+
+
+        // Offchain Worker:
+        // - Process the requests of the block and send commits
+        // - Send reveals when it's time
+		fn offchain_worker(block_number: T::BlockNumber) {
+
+		}
+
+	}
+}
+

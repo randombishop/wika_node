@@ -1,13 +1,13 @@
 [package]
 name = "wika-node"
-version = "3.0.0"
-authors = ["Substrate DevHub <https://github.com/substrate-developer-hub>"]
-description = "A fresh FRAME-based Substrate node, ready for hacking."
+version = "2.0.0"
+authors = ["Anonymous"]
+description = "A new FRAME-based Substrate node, ready for hacking."
 edition = "2018"
 license = "Unlicense"
 build = "build.rs"
 homepage = "https://substrate.dev"
-repository = "https://github.com/substrate-developer-hub/substrate-node-template/"
+repository = "https://github.com/paritytech/substrate/"
 
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]
@@ -35,7 +35,6 @@ sc-finality-grandpa = { version = "0.9.0", path = "../../substrate/client/finali
 sp-finality-grandpa = { version = "3.0.0", path = "../../substrate/primitives/finality-grandpa" }
 sc-client-api = { version = "3.0.0", path = "../../substrate/client/api" }
 sp-runtime = { version = "3.0.0", path = "../../substrate/primitives/runtime" }
-sp-timestamp = { version = "3.0.0", path = "../../substrate/primitives/timestamp" }
 
 # These dependencies are used for the node template's RPCs
 jsonrpc-core = "15.1.0"
@@ -49,10 +48,10 @@ substrate-frame-rpc-system = { version = "3.0.0", path = "../../substrate/utils/
 pallet-transaction-payment-rpc = { version = "3.0.0", path = "../../substrate/frame/transaction-payment/rpc/" }
 
 # These dependencies are used for runtime benchmarking
-frame-benchmarking = { version = "3.1.0", path = "../../substrate/frame/benchmarking" }
+frame-benchmarking = { version = "3.0.0", path = "../../substrate/frame/benchmarking" }
 frame-benchmarking-cli = { version = "3.0.0", path = "../../substrate/utils/frame/benchmarking-cli" }
 
-wika-runtime = { version = "3.0.0", path = "../runtime" }
+wika-runtime = { version = "2.0.0", path = "../runtime" }
 
 [build-dependencies]
 substrate-build-script-utils = { version = "3.0.0", path = "../../substrate/utils/build-script-utils" }

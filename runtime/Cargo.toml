@@ -1,11 +1,11 @@
 [package]
 name = "wika-runtime"
-version = "3.0.0"
-authors = ["Substrate DevHub <https://github.com/substrate-developer-hub>"]
+version = "2.0.0"
+authors = ["Anonymous"]
 edition = "2018"
 license = "Unlicense"
 homepage = "https://substrate.dev"
-repository = "https://github.com/substrate-developer-hub/substrate-node-template/"
+repository = "https://github.com/paritytech/substrate/"
 
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]
@@ -16,13 +16,14 @@ codec = { package = "parity-scale-codec", version = "2.0.0", default-features = 
 pallet-aura = { version = "3.0.0", default-features = false, path = "../../substrate/frame/aura" }
 pallet-balances = { version = "3.0.0", default-features = false, path = "../../substrate/frame/balances" }
 frame-support = { version = "3.0.0", default-features = false, path = "../../substrate/frame/support" }
-pallet-grandpa = { version = "3.1.0", default-features = false, path = "../../substrate/frame/grandpa" }
+pallet-grandpa = { version = "3.0.0", default-features = false, path = "../../substrate/frame/grandpa" }
 pallet-randomness-collective-flip = { version = "3.0.0", default-features = false, path = "../../substrate/frame/randomness-collective-flip" }
 pallet-sudo = { version = "3.0.0", default-features = false, path = "../../substrate/frame/sudo" }
 frame-system = { version = "3.0.0", default-features = false, path = "../../substrate/frame/system" }
 pallet-timestamp = { version = "3.0.0", default-features = false, path = "../../substrate/frame/timestamp" }
 pallet-transaction-payment = { version = "3.0.0", default-features = false, path = "../../substrate/frame/transaction-payment" }
 frame-executive = { version = "3.0.0", default-features = false, path = "../../substrate/frame/executive" }
+serde = { version = "1.0.101", optional = true, features = ["derive"] }
 sp-api = { version = "3.0.0", default-features = false, path = "../../substrate/primitives/api" }
 sp-block-builder = { path = "../../substrate/primitives/block-builder", default-features = false, version = "3.0.0"}
 sp-consensus-aura = { version = "0.9.0", default-features = false, path = "../../substrate/primitives/consensus/aura" }
@@ -40,11 +41,11 @@ frame-system-rpc-runtime-api = { version = "3.0.0", default-features = false, pa
 pallet-transaction-payment-rpc-runtime-api = { version = "3.0.0", default-features = false, path = "../../substrate/frame/transaction-payment/rpc/runtime-api/" }
 
 # Used for runtime benchmarking
-frame-benchmarking = { version = "3.1.0", default-features = false, path = "../../substrate/frame/benchmarking", optional = true }
+frame-benchmarking = { version = "3.0.0", default-features = false, path = "../../substrate/frame/benchmarking", optional = true }
 frame-system-benchmarking = { version = "3.0.0", default-features = false, path = "../../substrate/frame/system/benchmarking", optional = true }
 hex-literal = { version = "0.3.1", optional = true }
 
-pallet-template = { version = "3.0.0", default-features = false, path = "../pallets/template" }
+template = { default-features = false, path = "../pallets/template", package = "pallet-template" }
 
 [build-dependencies]
 substrate-wasm-builder = { version = "4.0.0", path = "../../substrate/utils/wasm-builder" }
@@ -55,17 +56,15 @@ std = [
 	"codec/std",
 	"frame-executive/std",
 	"frame-support/std",
-	"frame-system-rpc-runtime-api/std",
-	"frame-system/std",
 	"pallet-aura/std",
 	"pallet-balances/std",
 	"pallet-grandpa/std",
 	"pallet-randomness-collective-flip/std",
 	"pallet-sudo/std",
-	"pallet-template/std",
 	"pallet-timestamp/std",
-	"pallet-transaction-payment-rpc-runtime-api/std",
 	"pallet-transaction-payment/std",
+	"pallet-transaction-payment-rpc-runtime-api/std",
+	"serde",
 	"sp-api/std",
 	"sp-block-builder/std",
 	"sp-consensus-aura/std",
@@ -77,14 +76,17 @@ std = [
 	"sp-std/std",
 	"sp-transaction-pool/std",
 	"sp-version/std",
+	"frame-system/std",
+	"frame-system-rpc-runtime-api/std",
+	"template/std",
 ]
 runtime-benchmarks = [
+	"sp-runtime/runtime-benchmarks",
 	"frame-benchmarking",
 	"frame-support/runtime-benchmarks",
 	"frame-system-benchmarking",
-	"frame-system/runtime-benchmarks",
 	"hex-literal",
+	"frame-system/runtime-benchmarks",
 	"pallet-balances/runtime-benchmarks",
 	"pallet-timestamp/runtime-benchmarks",
-	"sp-runtime/runtime-benchmarks",
 ]

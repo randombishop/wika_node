@@ -40,7 +40,7 @@ pub use frame_support::{
 use pallet_transaction_payment::CurrencyAdapter;
 
 /// Import the template pallet.
-pub use pallet_template;
+pub use template;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -92,25 +92,17 @@ pub mod opaque {
 	}
 }
 
-// To learn more about runtime versioning and what each of the following value means:
-//   https://substrate.dev/docs/en/knowledgebase/runtime/upgrades#runtime-versioning
-#[sp_version::runtime_version]
 pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("node-template"),
 	impl_name: create_runtime_str!("node-template"),
 	authoring_version: 1,
-	// The version of the runtime specification. A full node will not attempt to use its native
-	//   runtime in substitute for the on-chain Wasm runtime unless all of `spec_name`,
-	//   `spec_version`, and `authoring_version` are the same between Wasm and native.
-	// This value is set to 100 to notify Polkadot-JS App (https://polkadot.js.org/apps) to use
-	//   the compatible custom types.
-	spec_version: 100,
+	spec_version: 1,
 	impl_version: 1,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 1,
 };
 
-/// This determines the average expected block time that we are targeting.
+/// This determines the average expected block time that we are targetting.
 /// Blocks will be produced at a minimum duration defined by `SLOT_DURATION`.
 /// `SLOT_DURATION` is picked up by `pallet_timestamp` which is in turn picked
 /// up by `pallet_aura` to implement `fn slot_duration()`.
@@ -118,8 +110,6 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 /// Change this to adjust the block time.
 pub const MILLISECS_PER_BLOCK: u64 = 6000;
 
-// NOTE: Currently it is not possible to change the slot duration after the chain has started.
-//       Attempting to do so will brick block production.
 pub const SLOT_DURATION: u64 = MILLISECS_PER_BLOCK;
 
 // Time is measured by number of blocks.
@@ -198,8 +188,6 @@ impl frame_system::Config for Runtime {
 	type SystemWeightInfo = ();
 	/// This is used as an identifier of the chain. 42 is the generic substrate prefix.
 	type SS58Prefix = SS58Prefix;
-	/// The set code logic, just the default since we're not a parachain.
-	type OnSetCode = ();
 }
 
 impl pallet_aura::Config for Runtime {
@@ -244,8 +232,6 @@ parameter_types! {
 
 impl pallet_balances::Config for Runtime {
 	type MaxLocks = MaxLocks;
-	type MaxReserves = ();
-	type ReserveIdentifier = [u8; 8];
 	/// The type for recording an account's balance.
 	type Balance = Balance;
 	/// The ubiquitous event type.
@@ -272,8 +258,8 @@ impl pallet_sudo::Config for Runtime {
 	type Call = Call;
 }
 
-/// Configure the pallet-template in pallets/template.
-impl pallet_template::Config for Runtime {
+/// Configure the pallet template in pallets/template.
+impl template::Config for Runtime {
 	type Event = Event;
 }
 
@@ -284,16 +270,16 @@ construct_runtime!(
 		NodeBlock = opaque::Block,
 		UncheckedExtrinsic = UncheckedExtrinsic
 	{
-		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
-		RandomnessCollectiveFlip: pallet_randomness_collective_flip::{Pallet, Call, Storage},
-		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
-		Aura: pallet_aura::{Pallet, Config<T>},
-		Grandpa: pallet_grandpa::{Pallet, Call, Storage, Config, Event},
-		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
-		TransactionPayment: pallet_transaction_payment::{Pallet, Storage},
-		Sudo: pallet_sudo::{Pallet, Call, Config<T>, Storage, Event<T>},
-		// Include the custom logic from the pallet-template in the runtime.
-		TemplateModule: pallet_template::{Pallet, Call, Storage, Event<T>},
+		System: frame_system::{Module, Call, Config, Storage, Event<T>},
+		RandomnessCollectiveFlip: pallet_randomness_collective_flip::{Module, Call, Storage},
+		Timestamp: pallet_timestamp::{Module, Call, Storage, Inherent},
+		Aura: pallet_aura::{Module, Config<T>},
+		Grandpa: pallet_grandpa::{Module, Call, Storage, Config, Event},
+		Balances: pallet_balances::{Module, Call, Storage, Config<T>, Event<T>},
+		TransactionPayment: pallet_transaction_payment::{Module, Storage},
+		Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
+		// Include the custom logic from the template pallet in the runtime.
+		TemplateModule: template::{Module, Call, Storage, Event<T>},
 	}
 );
 
@@ -327,7 +313,7 @@ pub type Executive = frame_executive::Executive<
 	Block,
 	frame_system::ChainContext<Runtime>,
 	Runtime,
-	AllPallets,
+	AllModules,
 >;
 
 impl_runtime_apis! {
@@ -337,7 +323,7 @@ impl_runtime_apis! {
 		}
 
 		fn execute_block(block: Block) {
-			Executive::execute_block(block);
+			Executive::execute_block(block)
 		}
 
 		fn initialize_block(header: &<Block as BlockT>::Header) {
@@ -370,6 +356,10 @@ impl_runtime_apis! {
 		) -> sp_inherents::CheckInherentsResult {
 			data.check_extrinsics(&block)
 		}
+
+		fn random_seed() -> <Block as BlockT>::Hash {
+			RandomnessCollectiveFlip::random_seed()
+		}
 	}
 
 	impl sp_transaction_pool::runtime_api::TaggedTransactionQueue<Block> for Runtime {
@@ -388,8 +378,8 @@ impl_runtime_apis! {
 	}
 
 	impl sp_consensus_aura::AuraApi<Block, AuraId> for Runtime {
-		fn slot_duration() -> sp_consensus_aura::SlotDuration {
-			sp_consensus_aura::SlotDuration::from_millis(Aura::slot_duration())
+		fn slot_duration() -> u64 {
+			Aura::slot_duration()
 		}
 
 		fn authorities() -> Vec<AuraId> {
@@ -463,7 +453,7 @@ impl_runtime_apis! {
 		) -> Result<Vec<frame_benchmarking::BenchmarkBatch>, sp_runtime::RuntimeString> {
 			use frame_benchmarking::{Benchmarking, BenchmarkBatch, add_benchmark, TrackedStorageKey};
 
-			use frame_system_benchmarking::Pallet as SystemBench;
+			use frame_system_benchmarking::Module as SystemBench;
 			impl frame_system_benchmarking::Config for Runtime {}
 
 			let whitelist: Vec<TrackedStorageKey> = vec![
@@ -485,7 +475,6 @@ impl_runtime_apis! {
 			add_benchmark!(params, batches, frame_system, SystemBench::<Runtime>);
 			add_benchmark!(params, batches, pallet_balances, Balances);
 			add_benchmark!(params, batches, pallet_timestamp, Timestamp);
-			add_benchmark!(params, batches, pallet_template, TemplateModule);
 
 			if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }
 			Ok(batches)

@@ -11,19 +11,10 @@ repository = "https://github.com/paritytech/substrate/"
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
+# General
 codec = { package = "parity-scale-codec", version = "2.0.0", default-features = false, features = ["derive"] }
-
-pallet-aura = { version = "3.0.0", default-features = false, path = "../../substrate/frame/aura" }
-pallet-balances = { version = "3.0.0", default-features = false, path = "../../substrate/frame/balances" }
-frame-support = { version = "3.0.0", default-features = false, path = "../../substrate/frame/support" }
-pallet-grandpa = { version = "3.0.0", default-features = false, path = "../../substrate/frame/grandpa" }
-pallet-randomness-collective-flip = { version = "3.0.0", default-features = false, path = "../../substrate/frame/randomness-collective-flip" }
-pallet-sudo = { version = "3.0.0", default-features = false, path = "../../substrate/frame/sudo" }
-frame-system = { version = "3.0.0", default-features = false, path = "../../substrate/frame/system" }
-pallet-timestamp = { version = "3.0.0", default-features = false, path = "../../substrate/frame/timestamp" }
-pallet-transaction-payment = { version = "3.0.0", default-features = false, path = "../../substrate/frame/transaction-payment" }
-frame-executive = { version = "3.0.0", default-features = false, path = "../../substrate/frame/executive" }
 serde = { version = "1.0.101", optional = true, features = ["derive"] }
+# Substrate primitives
 sp-api = { version = "3.0.0", default-features = false, path = "../../substrate/primitives/api" }
 sp-block-builder = { path = "../../substrate/primitives/block-builder", default-features = false, version = "3.0.0"}
 sp-consensus-aura = { version = "0.9.0", default-features = false, path = "../../substrate/primitives/consensus/aura" }
@@ -35,17 +26,27 @@ sp-session = { version = "3.0.0", default-features = false, path = "../../substr
 sp-std = { version = "3.0.0", default-features = false, path = "../../substrate/primitives/std" }
 sp-transaction-pool = { version = "3.0.0", default-features = false, path = "../../substrate/primitives/transaction-pool" }
 sp-version = { version = "3.0.0", default-features = false, path = "../../substrate/primitives/version" }
-
-# Used for the node template's RPCs
+# Substrate frame
+frame-support = { version = "3.0.0", default-features = false, path = "../../substrate/frame/support" }
+frame-system = { version = "3.0.0", default-features = false, path = "../../substrate/frame/system" }
+frame-executive = { version = "3.0.0", default-features = false, path = "../../substrate/frame/executive" }
+# Substrate pallets
+pallet-aura = { version = "3.0.0", default-features = false, path = "../../substrate/frame/aura" }
+pallet-balances = { version = "3.0.0", default-features = false, path = "../../substrate/frame/balances" }
+pallet-timestamp = { version = "3.0.0", default-features = false, path = "../../substrate/frame/timestamp" }
+pallet-transaction-payment = { version = "3.0.0", default-features = false, path = "../../substrate/frame/transaction-payment" }
+pallet-grandpa = { version = "3.0.0", default-features = false, path = "../../substrate/frame/grandpa" }
+pallet-randomness-collective-flip = { version = "3.0.0", default-features = false, path = "../../substrate/frame/randomness-collective-flip" }
+pallet-sudo = { version = "3.0.0", default-features = false, path = "../../substrate/frame/sudo" }
+# Substrate RPC
 frame-system-rpc-runtime-api = { version = "3.0.0", default-features = false, path = "../../substrate/frame/system/rpc/runtime-api/" }
 pallet-transaction-payment-rpc-runtime-api = { version = "3.0.0", default-features = false, path = "../../substrate/frame/transaction-payment/rpc/runtime-api/" }
-
-# Used for runtime benchmarking
+# Benchmarking
 frame-benchmarking = { version = "3.0.0", default-features = false, path = "../../substrate/frame/benchmarking", optional = true }
 frame-system-benchmarking = { version = "3.0.0", default-features = false, path = "../../substrate/frame/system/benchmarking", optional = true }
 hex-literal = { version = "0.3.1", optional = true }
-
-template = { default-features = false, path = "../pallets/template", package = "pallet-template" }
+# Wika Pallets
+pallet-owners = { default-features = false, path = "../pallets/owners" }
 
 [build-dependencies]
 substrate-wasm-builder = { version = "4.0.0", path = "../../substrate/utils/wasm-builder" }
@@ -78,7 +79,7 @@ std = [
 	"sp-version/std",
 	"frame-system/std",
 	"frame-system-rpc-runtime-api/std",
-	"template/std",
+	"pallet-owners/std",
 ]
 runtime-benchmarks = [
 	"sp-runtime/runtime-benchmarks",

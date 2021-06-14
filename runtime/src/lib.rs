@@ -52,11 +52,11 @@ use pallet_transaction_payment::CurrencyAdapter;
 
 
 
-
+use codec::{Encode} ;
+use frame_system::offchain::AppCrypto ;
 
 // Import the template pallet.
-use pallet_owners;
-use codec::{Decode,Encode} ;
+pub use pallet_owners;
 
 
 
@@ -361,10 +361,19 @@ where
 // Pallet Owners
 // -------------------
 
+parameter_types! {
+	pub const MaxLengthURL: u8 = 255;
+	pub const NumChecksRequired: u8 = 1;
+}
+
 impl pallet_owners::Config for Runtime {
 	type OwnersAppCrypto = pallet_owners::crypto::OwnersAppCrypto;
+	type OwnersPublic = <pallet_owners::crypto::OwnersAppCrypto as AppCrypto<MultiSigner, MultiSignature>>::RuntimeAppPublic ;
 	type Call = Call;
 	type Event = Event;
+	type Currency = pallet_balances::Module<Runtime>;
+	type MaxLengthURL = MaxLengthURL;
+	type NumChecksRequired = NumChecksRequired ;
 }
 
 

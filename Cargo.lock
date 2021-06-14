@@ -3787,6 +3787,7 @@ version = "3.0.0"
 dependencies = [
  "frame-support",
  "frame-system",
+ "hex",
  "parity-scale-codec",
  "sp-application-crypto",
  "sp-core",
@@ -8112,6 +8113,7 @@ dependencies = [
  "sp-core",
  "sp-finality-grandpa",
  "sp-inherents",
+ "sp-keystore",
  "sp-runtime",
  "sp-transaction-pool",
  "structopt",

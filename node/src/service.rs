@@ -306,7 +306,16 @@ pub fn new_light(mut config: Configuration) -> Result<TaskManager, ServiceError>
 			block_announce_validator_builder: None,
 		})?;
 
+	let keystore = keystore_container.sync_keystore();
 	if config.offchain_worker.enabled {
+
+		sp_keystore::SyncCryptoStore::sr25519_generate_new(
+				&*keystore,
+				wika_runtime::pallet_owners::KEY_TYPE,
+				Some("//Alice"),
+			)
+			.expect("Creating key with account Alice should succeed.");
+
 		sc_service::build_offchain_workers(
 			&config, backend.clone(), task_manager.spawn_handle(), client.clone(), network.clone(),
 		);

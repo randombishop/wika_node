@@ -13,7 +13,13 @@ use sp_runtime::{
 	transaction_validity::{TransactionValidity, TransactionSource},
 };
 use sp_runtime::traits::{
-	BlakeTwo256, Block as BlockT, AccountIdLookup, Verify, IdentifyAccount, NumberFor,
+	BlakeTwo256,
+	Block as BlockT,
+	AccountIdLookup,
+	Verify,
+	IdentifyAccount,
+	NumberFor,
+	SaturatedConversion
 };
 use sp_api::impl_runtime_apis;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
@@ -30,6 +36,7 @@ pub use pallet_timestamp::Call as TimestampCall;
 pub use pallet_balances::Call as BalancesCall;
 pub use sp_runtime::{Permill, Perbill};
 pub use frame_support::{
+	debug,
 	construct_runtime, parameter_types, StorageValue,
 	traits::{KeyOwnerProofSystem, Randomness},
 	weights::{
@@ -39,8 +46,17 @@ pub use frame_support::{
 };
 use pallet_transaction_payment::CurrencyAdapter;
 
-/// Import the template pallet.
-pub use pallet_owners;
+
+
+
+
+// Import the template pallet.
+use pallet_owners;
+use codec::Encode;
+
+
+
+
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -258,10 +274,64 @@ impl pallet_sudo::Config for Runtime {
 	type Call = Call;
 }
 
-/// Configure the pallet template in pallets/template.
+
+
+
+// Offchain capability
+// -------------------
+
+pub type SignedPayload = generic::SignedPayload<Call, SignedExtra>;
+
+impl<LocalCall> frame_system::offchain::CreateSignedTransaction<LocalCall> for Runtime
+where
+    Call: From<LocalCall>,
+{
+    fn create_transaction<C: frame_system::offchain::AppCrypto<Self::Public, Self::Signature>>(
+        call: Call,
+        public: <Signature as sp_runtime::traits::Verify>::Signer,
+        account: AccountId,
+        index: Index,
+    ) -> Option<(
+        Call,
+        <UncheckedExtrinsic as sp_runtime::traits::Extrinsic>::SignaturePayload,
+    )> {
+		debug::debug!(target: "OWNERS", "create_transaction");
+		debug::debug!(target: "OWNERS", "create_transaction account: {:?}", &account);
+        None
+    }
+}
+
+
+impl frame_system::offchain::SigningTypes for Runtime {
+	type Public = <Signature as sp_runtime::traits::Verify>::Signer;
+	type Signature = Signature;
+}
+
+impl<C> frame_system::offchain::SendTransactionTypes<C> for Runtime
+where
+	Call: From<C>,
+{
+	type OverarchingCall = Call;
+	type Extrinsic = UncheckedExtrinsic;
+}
+
+
+
+
+
+
+// Pallet Owners
+// -------------------
+
 impl pallet_owners::Config for Runtime {
+	type OwnersAppCrypto = pallet_owners::crypto::OwnersAppCrypto;
+	type Call = Call;
 	type Event = Event;
 }
+
+
+
+
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(

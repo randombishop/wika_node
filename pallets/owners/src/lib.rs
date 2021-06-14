@@ -5,18 +5,63 @@
 // Imports
 // -------------------------------------------------
 
+use sp_std::vec::Vec;
+
 use frame_support::{
 	debug,
 	decl_error, decl_event, decl_module, decl_storage,
 };
 
-use sp_std::vec::Vec;
+use frame_system::offchain::{
+	AppCrypto,
+	SendSignedTransaction,
+	CreateSignedTransaction,
+	Signer
+};
+
+use sp_core::{crypto::KeyTypeId};
+
+
+
+
+
+// Offchain boilerplate
+
+pub const KEY_TYPE: KeyTypeId = KeyTypeId(*b"ownr");
+
+pub mod crypto {
+	use crate::KEY_TYPE;
+	use sp_core::sr25519::Signature as Sr25519Signature;
+	use sp_runtime::app_crypto::{app_crypto, sr25519};
+	use sp_runtime::{traits::Verify, MultiSignature, MultiSigner};
+
+	app_crypto!(sr25519, KEY_TYPE);
+
+	pub struct OwnersAppCrypto;
+
+	impl frame_system::offchain::AppCrypto<MultiSigner, MultiSignature> for OwnersAppCrypto {
+		type RuntimeAppPublic = Public;
+		type GenericSignature = sp_core::sr25519::Signature;
+		type GenericPublic = sp_core::sr25519::Public;
+	}
+
+	impl frame_system::offchain::AppCrypto<<Sr25519Signature as Verify>::Signer, Sr25519Signature>
+		for OwnersAppCrypto
+	{
+		type RuntimeAppPublic = Public;
+		type GenericSignature = sp_core::sr25519::Signature;
+		type GenericPublic = sp_core::sr25519::Public;
+	}
+}
+
 
 
 // Trait, types and constants used by this pallet
 // -------------------------------------------------
 
-pub trait Config: frame_system::Config  {
+pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
+	type OwnersAppCrypto: AppCrypto<Self::Public, Self::Signature>;
+	type Call: From<Call<Self>>;
 	type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
 }
 
@@ -192,6 +237,11 @@ decl_module! {
         // - Send reveals when it's time
 		fn offchain_worker(block_number: T::BlockNumber) {
 			debug::debug!(target: "OWNERS", "offchain_worker checking node account");
+
+			let signer = Signer::<T, T::OwnersAppCrypto>::any_account();
+			let number: u64 = 123 ;
+			let result = signer.send_signed_transaction(|_acct| Call::test_tx(number));
+
 		}
 
 	}

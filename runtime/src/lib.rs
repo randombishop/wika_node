@@ -9,7 +9,10 @@ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 use sp_std::prelude::*;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
 use sp_runtime::{
-	ApplyExtrinsicResult, generic, create_runtime_str, impl_opaque_keys, MultiSignature,
+	create_runtime_str, generic,
+	ApplyExtrinsicResult,
+	impl_opaque_keys,
+	MultiSignature,
 	transaction_validity::{TransactionValidity, TransactionSource},
 };
 use sp_runtime::traits::{
@@ -52,7 +55,7 @@ use pallet_transaction_payment::CurrencyAdapter;
 
 // Import the template pallet.
 use pallet_owners;
-use codec::Encode;
+use codec::{Decode,Encode} ;
 
 
 
@@ -297,7 +300,41 @@ where
     )> {
 		debug::debug!(target: "OWNERS", "create_transaction");
 		debug::debug!(target: "OWNERS", "create_transaction account: {:?}", &account);
-        None
+
+		let period = BlockHashCount::get() as u64;
+		let current_block = System::block_number()
+			.saturated_into::<u64>()
+			.saturating_sub(1);
+		let tip = 0;
+		let extra: SignedExtra = (
+			frame_system::CheckSpecVersion::<Runtime>::new(),
+			frame_system::CheckTxVersion::<Runtime>::new(),
+			frame_system::CheckGenesis::<Runtime>::new(),
+			frame_system::CheckEra::<Runtime>::from(generic::Era::mortal(period, current_block)),
+			frame_system::CheckNonce::<Runtime>::from(index),
+			frame_system::CheckWeight::<Runtime>::new(),
+			pallet_transaction_payment::ChargeTransactionPayment::<Runtime>::from(tip),
+		);
+
+		let raw_payload = SignedPayload::new(call, extra)
+			.map_err(|e| {
+				debug::native::warn!("SignedPayload error: {:?}", e);
+			})
+			.ok()?;
+		debug::debug!(target: "OWNERS", "create_transaction raw payload ok");
+
+		raw_payload.using_encoded(|payload| {
+			debug::debug!(target: "OWNERS", "create_transaction payload: {:?}", &payload);
+		});
+
+		let signature = raw_payload.using_encoded(|payload| C::sign(payload, public));
+		debug::debug!(target: "OWNERS", "create_transaction signature: {:?}", &signature);
+
+
+		//let address = account;
+		//let (call, extra, _) = raw_payload.deconstruct();
+		//Some((call, (address.into(), signature, extra)))
+		None
     }
 }
 

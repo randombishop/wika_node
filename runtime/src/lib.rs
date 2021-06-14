@@ -13,6 +13,7 @@ use sp_runtime::{
 	ApplyExtrinsicResult,
 	impl_opaque_keys,
 	MultiSignature,
+	MultiSigner,
 	transaction_validity::{TransactionValidity, TransactionSource},
 };
 use sp_runtime::traits::{
@@ -300,6 +301,7 @@ where
     )> {
 		debug::debug!(target: "OWNERS", "create_transaction");
 		debug::debug!(target: "OWNERS", "create_transaction account: {:?}", &account);
+		debug::debug!(target: "OWNERS", "create_transaction public: {:?}", &public);
 
 		let period = BlockHashCount::get() as u64;
 		let current_block = System::block_number()
@@ -323,18 +325,17 @@ where
 			.ok()?;
 		debug::debug!(target: "OWNERS", "create_transaction raw payload ok");
 
-		raw_payload.using_encoded(|payload| {
-			debug::debug!(target: "OWNERS", "create_transaction payload: {:?}", &payload);
-		});
-
 		let signature = raw_payload.using_encoded(|payload| C::sign(payload, public));
 		debug::debug!(target: "OWNERS", "create_transaction signature: {:?}", &signature);
 
-
-		//let address = account;
-		//let (call, extra, _) = raw_payload.deconstruct();
-		//Some((call, (address.into(), signature, extra)))
-		None
+		if signature.is_none() {
+			None
+		} else {
+			let signature = signature.unwrap() ;
+			let address = account;
+			let (call, extra, _) = raw_payload.deconstruct();
+			Some((call, (address.into(), signature, extra)))
+		}
     }
 }
 

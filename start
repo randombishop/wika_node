@@ -1,1 +1,1 @@
- ./target/debug/wika-node --dev --tmp -lOWNER=debug
+ ./target/debug/wika-node --dev --tmp -lOWNERS=debug

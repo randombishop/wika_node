@@ -6,6 +6,7 @@
 // -------------------------------------------------
 
 use frame_support::{
+	debug,
 	decl_error, decl_event, decl_module, decl_storage,
 };
 
@@ -182,7 +183,7 @@ decl_module! {
 		// Test Tx
         #[weight = 10_000]
         fn test_tx(origin, number:u64) {
-
+			debug::debug!(target: "OWNERS", "test_tx");
         }
 
 
@@ -190,7 +191,7 @@ decl_module! {
         // - Process the requests of the block and send commits
         // - Send reveals when it's time
 		fn offchain_worker(block_number: T::BlockNumber) {
-
+			debug::debug!(target: "OWNERS", "offchain_worker checking node account");
 		}
 
 	}

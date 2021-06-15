@@ -114,7 +114,7 @@ const FETCH_TIMEOUT_PERIOD: u64 = 5000 ;
 
 const MARK_PREFIX: &str  = "wika.network/author/" ;
 
-
+const REVEAL_QUEUE_PREFIX: &[u8] = b"owner/rq";
 
 
 
@@ -609,6 +609,16 @@ impl<T: Config> Module<T> {
 
 	fn current_block_number() -> T::BlockNumber {
 		<frame_system::Module<T>>::block_number()
+	}
+
+	fn key_reveals_for_block(block_number: T::BlockNumber) -> Vec<u8> {
+		block_number.using_encoded(|encoded_bn| {
+			REVEAL_QUEUE_PREFIX.clone().into_iter()
+				.chain(b"/".into_iter())
+				.chain(encoded_bn)
+				.copied()
+				.collect::<Vec<u8>>()
+		})
 	}
 
 }

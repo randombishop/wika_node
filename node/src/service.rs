@@ -134,7 +134,16 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError> 
 			block_announce_validator_builder: None,
 		})?;
 
+	let keystore = keystore_container.sync_keystore();
 	if config.offchain_worker.enabled {
+
+		sp_keystore::SyncCryptoStore::sr25519_generate_new(
+				&*keystore,
+				wika_runtime::pallet_owners::KEY_TYPE,
+				Some("//Alice"),
+			)
+			.expect("Creating key with account Alice should succeed.");
+
 		sc_service::build_offchain_workers(
 			&config, backend.clone(), task_manager.spawn_handle(), client.clone(), network.clone(),
 		);
@@ -166,7 +175,7 @@ pub fn new_full(mut config: Configuration) -> Result<TaskManager, ServiceError> 
 		sc_service::SpawnTasksParams {
 			network: network.clone(),
 			client: client.clone(),
-			keystore: keystore_container.sync_keystore(),
+			keystore: keystore,
 			task_manager: &mut task_manager,
 			transaction_pool: transaction_pool.clone(),
 			rpc_extensions_builder,
@@ -329,7 +338,7 @@ pub fn new_light(mut config: Configuration) -> Result<TaskManager, ServiceError>
 		rpc_extensions_builder: Box::new(|_, _| ()),
 		config,
 		client,
-		keystore: keystore_container.sync_keystore(),
+		keystore: keystore,
 		backend,
 		network,
 		network_status_sinks,

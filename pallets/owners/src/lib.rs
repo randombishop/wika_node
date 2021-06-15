@@ -416,7 +416,7 @@ impl<T: Config> Module<T> {
 			let bytes: [u8; 32] = x.as_ref().try_into().expect("cant fail") ;
 			let account: T::AccountId = T::AccountId::decode(&mut &bytes[..]).expect("never fails") ;
 			debug::debug!(target: "OWNERS", "offchain_worker account: {:?}", &account);
-			if Verifiers::<T>::contains_key(&account) {
+			if Self::is_verifier_enabled(&account) {
 				return Some(x) ;
 			}
 		}

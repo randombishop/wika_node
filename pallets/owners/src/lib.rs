@@ -39,8 +39,8 @@ use sp_runtime::{
 	offchain as rt_offchain,
 	offchain::{
 		storage::StorageValueRef,
-		storage_lock::{Time, StorageLock},
-		Duration
+		//storage_lock::{Time, StorageLock},
+		//Duration
 	},
 };
 
@@ -55,6 +55,11 @@ use parity_scale_codec::{Encode,Decode};
 use core::fmt::Debug ;
 
 use hex ;
+
+use numtoa::NumToA ;
+
+
+
 
 
 
@@ -118,9 +123,9 @@ const FETCH_TIMEOUT_PERIOD: u64 = 5000 ;
 
 const MARK_PREFIX: &str  = "wika.network/author/" ;
 
-const REVEAL_QUEUE_PREFIX: &[u8] = b"owner/rq";
+const REVEAL_QUEUE_PREFIX: &[u8] = b"ownr/r/";
 
-const OFFCHAIN_CACHE_LOCK_TIMEOUT_MS: u64 = 250 ;
+//const OFFCHAIN_CACHE_LOCK_TIMEOUT_MS: u64 = 250 ;
 
 
 
@@ -215,7 +220,7 @@ fn fetch_from_url(url: &Vec<u8>) -> Option<Vec<u8>> {
 // Offchain caching to manage reveals
 // -------------------------------------------------
 
-#[derive(Encode, Decode, Default, Clone, PartialEq)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Debug)]
 pub struct RevealItem {
     url: Vec<u8>,
 	vote: bool,
@@ -239,58 +244,49 @@ impl RevealItem {
 	}
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq)]
-pub struct RevealList(Vec<RevealItem>) ;
+
 
 struct OffchainCache {}
 
 impl OffchainCache {
 
 	fn key_reveals_at_block(block_number: u32) -> Vec<u8> {
-		block_number.using_encoded(|encoded_bn| {
-			REVEAL_QUEUE_PREFIX.clone().into_iter()
-				.chain(b"/".into_iter())
-				.chain(encoded_bn)
-				.copied()
-				.collect::<Vec<u8>>()
-		})
+		let mut ans: Vec<u8> = sp_std::vec![] ;
+		ans.append(&mut REVEAL_QUEUE_PREFIX.into()) ;
+		let mut tmp: [u8; 16] = [0;16] ;
+		let num = block_number.numtoa(10, &mut tmp) ;
+		ans.append(&mut num.into()) ;
+		ans
+	}
+
+	fn delete_list(key: &Vec<u8>) {
+		let mut cache = StorageValueRef::persistent(key);
+		cache.clear() ;
+		debug::debug!(target: "OWNERS", "OffchainCache list deleted: {:?}", sp_std::str::from_utf8(&key));
 	}
 
 	fn add_reveal_to_existing_list(key: &[u8], item: RevealItem) {
-		let mut lock = StorageLock::<Time>::with_deadline(
-			key,
-			Duration::from_millis(OFFCHAIN_CACHE_LOCK_TIMEOUT_MS),
-		);
-		if let Ok(_guard) = lock.try_lock() {
-			let cache = StorageValueRef::persistent(&key) ;
-			let update = cache.mutate(|o: Option<Option<RevealList>>| {
-				if let Some(Some(mut list)) = o {
-					list.0.push(item) ;
-					return Ok(list) ;
-				} else {
-					return Err(()) ;
-				}
-			});
-			if update.is_err() {
-				debug::error!(target: "OWNERS", "OffchainCache list update failed: {:?}", sp_std::str::from_utf8(&key));
+		let cache = StorageValueRef::persistent(key) ;
+		let update = cache.mutate(|o: Option<Option<Vec<RevealItem>>>| {
+			if let Some(Some(mut list)) = o {
+				list.push(item) ;
+				return Ok(list) ;
 			} else {
-				debug::debug!(target: "OWNERS", "OffchainCache list updated: {:?}", sp_std::str::from_utf8(&key));
+				return Err(()) ;
 			}
+		});
+		if update.is_err() {
+			debug::error!(target: "OWNERS", "OffchainCache list update failed: {:?}", sp_std::str::from_utf8(&key));
+		} else {
+			debug::debug!(target: "OWNERS", "OffchainCache list updated: {:?}", sp_std::str::from_utf8(&key));
 		}
-		;
 	}
 
 	fn add_reveal_to_new_list(key: &[u8], item: RevealItem) {
-		let data: RevealList = RevealList(sp_std::vec![item]) ;
-		let mut lock = StorageLock::<Time>::with_deadline(
-			key,
-			Duration::from_millis(OFFCHAIN_CACHE_LOCK_TIMEOUT_MS),
-		);
-		if let Ok(_guard) = lock.try_lock() {
-			let cache = StorageValueRef::persistent(&key) ;
-			cache.set(&data) ;
-		}
-		debug::debug!(target: "OWNERS", "OffchainCache new list created: {:?}", sp_std::str::from_utf8(&key));
+		let data: Vec<RevealItem> = sp_std::vec![item] ;
+		let cache = StorageValueRef::persistent(key) ;
+		cache.set(&data) ;
+		debug::debug!(target: "OWNERS", "OffchainCache new list created: {:?}", sp_std::str::from_utf8(key));
 	}
 
 	pub fn save_reveal_at_block(url: &Vec<u8>, block_number: u32, vote: bool, intro: &Vec<u8>, proof: Option<&Vec<u8>>, salt: &Vec<u8>) {
@@ -302,18 +298,19 @@ impl OffchainCache {
 
 		// Save to new list or add to existing one
 		let cache = StorageValueRef::persistent(&key);
-		if let Some(Some(_)) = cache.get::<RevealList>() {
+		if let Some(Some(_)) = cache.get::<Vec<bool>>() {
 			Self::add_reveal_to_existing_list(&key, reveal) ;
 		} else {
 			Self::add_reveal_to_new_list(&key, reveal) ;
 		}
 	}
 
-	pub fn take_reveal_list(block_number: u32) -> Vec<RevealItem> {
+	pub fn get_reveal_list(block_number: u32) -> Vec<RevealItem> {
 		let key = Self::key_reveals_at_block(block_number) ;
+		debug::debug!(target: "OWNERS", "OffchainCache take_reveal_list key: {:?}", sp_std::str::from_utf8(&key));
 		let cache = StorageValueRef::persistent(&key);
-		if let Some(Some(list)) = cache.get::<RevealList>() {
-			return list.0 ;
+		if let Some(Some(list)) = cache.get::<Vec<RevealItem>>() {
+			return list ;
 		} else {
 			return sp_std::vec![] ;
 		}
@@ -935,6 +932,7 @@ decl_module! {
 			debug::debug!(target: "OWNERS", "reveal_verification current_block: {:?}", &current_block);
 			debug::debug!(target: "OWNERS", "reveal_verification min_block: {:?}", &min_block);
 			debug::debug!(target: "OWNERS", "reveal_verification max_block: {:?}", &max_block);
+			debug::debug!(target: "OWNERS", "reveal_verification timing_ok: {:?}", &timing_ok);
 			ensure!(timing_ok, Error::<T>::OffTimeToReveal) ;
 
             // Check that the result was previously committed
@@ -988,6 +986,7 @@ decl_module! {
 		fn offchain_worker(block_number: T::BlockNumber) {
 			// Check verifier status
 			debug::debug!(target: "OWNERS", "offchain_worker checking node account");
+
 			let account = Self::am_i_verifier() ;
 			if account.is_none() {
 				debug::debug!(target: "OWNERS", "offchain_worker is OFF");
@@ -1008,8 +1007,10 @@ decl_module! {
 			// Send reveals
 			debug::debug!(target: "OWNERS", "offchain_worker sending reveals prepared some blocks ago...");
 			let block_number32 = block_to_u32::<T>(block_number) ;
-			let reveals = OffchainCache::take_reveal_list(block_number32) ;
+			let reveals = OffchainCache::get_reveal_list(block_number32) ;
+			debug::debug!(target: "OWNERS", "offchain_worker num reveals found: {:?}", reveals.len());
 			for r in reveals {
+				debug::debug!(target: "OWNERS", "offchain_worker revealing: {:?}", r);
 				let proof = match r.proof {
 					Some(x) => x,
 					None => sp_std::vec![]
@@ -1017,6 +1018,8 @@ decl_module! {
 				Self::send_reveal_offchain(&r.url, r.vote, &r.intro, &proof, &r.salt) ;
 			}
 
+			// Finish
+			debug::debug!(target: "OWNERS", "offchain_worker DONE");
 		}
 
 	}

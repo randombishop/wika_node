@@ -36,8 +36,12 @@ use sp_runtime::{
 	traits::{
 		AccountIdConversion
 	},
-	RuntimeDebug,
 	offchain as rt_offchain,
+	offchain::{
+		storage::StorageValueRef,
+		storage_lock::{Time, StorageLock},
+		Duration
+	},
 };
 
 use sp_core::{crypto::KeyTypeId};
@@ -116,7 +120,7 @@ const MARK_PREFIX: &str  = "wika.network/author/" ;
 
 const REVEAL_QUEUE_PREFIX: &[u8] = b"owner/rq";
 
-
+const OFFCHAIN_CACHE_LOCK_TIMEOUT_MS: u64 = 250 ;
 
 
 
@@ -138,6 +142,7 @@ fn block_to_u32<T:Config>(input: T::BlockNumber) -> u32 {
 		Err(_) => 0
 	}
 }
+
 
 
 
@@ -207,8 +212,123 @@ fn fetch_from_url(url: &Vec<u8>) -> Option<Vec<u8>> {
 
 
 
+// Offchain caching to manage reveals
+// -------------------------------------------------
 
-// Persistent data
+#[derive(Encode, Decode, Default, Clone, PartialEq)]
+pub struct RevealItem {
+    url: Vec<u8>,
+	vote: bool,
+	intro: Vec<u8>,
+	proof: Option<Vec<u8>>,
+	salt: Vec<u8>
+}
+
+impl RevealItem {
+	fn new(url: &Vec<u8>, vote: bool, intro: &Vec<u8>, proof: Option<&Vec<u8>>, salt: &Vec<u8>) -> RevealItem {
+		RevealItem {
+			url: url.clone(),
+			vote: vote,
+			intro: intro.clone(),
+			proof: match proof {
+				Some(s) => Some(s.clone()),
+				None => None
+			},
+			salt: salt.clone()
+		}
+	}
+}
+
+#[derive(Encode, Decode, Default, Clone, PartialEq)]
+pub struct RevealList(Vec<RevealItem>) ;
+
+struct OffchainCache {}
+
+impl OffchainCache {
+
+	fn key_reveals_at_block(block_number: u32) -> Vec<u8> {
+		block_number.using_encoded(|encoded_bn| {
+			REVEAL_QUEUE_PREFIX.clone().into_iter()
+				.chain(b"/".into_iter())
+				.chain(encoded_bn)
+				.copied()
+				.collect::<Vec<u8>>()
+		})
+	}
+
+	fn add_reveal_to_existing_list(key: &[u8], item: RevealItem) {
+		let mut lock = StorageLock::<Time>::with_deadline(
+			key,
+			Duration::from_millis(OFFCHAIN_CACHE_LOCK_TIMEOUT_MS),
+		);
+		if let Ok(_guard) = lock.try_lock() {
+			let cache = StorageValueRef::persistent(&key) ;
+			let update = cache.mutate(|o: Option<Option<RevealList>>| {
+				if let Some(Some(mut list)) = o {
+					list.0.push(item) ;
+					return Ok(list) ;
+				} else {
+					return Err(()) ;
+				}
+			});
+			if update.is_err() {
+				debug::error!(target: "OWNERS", "OffchainCache list update failed: {:?}", sp_std::str::from_utf8(&key));
+			} else {
+				debug::debug!(target: "OWNERS", "OffchainCache list updated: {:?}", sp_std::str::from_utf8(&key));
+			}
+		}
+		;
+	}
+
+	fn add_reveal_to_new_list(key: &[u8], item: RevealItem) {
+		let data: RevealList = RevealList(sp_std::vec![item]) ;
+		let mut lock = StorageLock::<Time>::with_deadline(
+			key,
+			Duration::from_millis(OFFCHAIN_CACHE_LOCK_TIMEOUT_MS),
+		);
+		if let Ok(_guard) = lock.try_lock() {
+			let cache = StorageValueRef::persistent(&key) ;
+			cache.set(&data) ;
+		}
+		debug::debug!(target: "OWNERS", "OffchainCache new list created: {:?}", sp_std::str::from_utf8(&key));
+	}
+
+	pub fn save_reveal_at_block(url: &Vec<u8>, block_number: u32, vote: bool, intro: &Vec<u8>, proof: Option<&Vec<u8>>, salt: &Vec<u8>) {
+		// Prepare to save
+		debug::debug!(target: "OWNERS", "OffchainCache saving a new reveal at block: {:?}", block_number);
+		let key = Self::key_reveals_at_block(block_number) ;
+		debug::debug!(target: "OWNERS", "OffchainCache storage key: {:?}", sp_std::str::from_utf8(&key));
+		let reveal = RevealItem::new(url, vote, intro, proof, salt) ;
+
+		// Save to new list or add to existing one
+		let cache = StorageValueRef::persistent(&key);
+		if let Some(Some(_)) = cache.get::<RevealList>() {
+			Self::add_reveal_to_existing_list(&key, reveal) ;
+		} else {
+			Self::add_reveal_to_new_list(&key, reveal) ;
+		}
+	}
+
+	pub fn take_reveal_list(block_number: u32) -> Vec<RevealItem> {
+		let key = Self::key_reveals_at_block(block_number) ;
+		let cache = StorageValueRef::persistent(&key);
+		if let Some(Some(list)) = cache.get::<RevealList>() {
+			return list.0 ;
+		} else {
+			return sp_std::vec![] ;
+		}
+	}
+
+}
+
+
+
+
+
+
+
+
+// Onchain Persistent data
 // -------------------------------------------------
 
 decl_storage! {
@@ -399,15 +519,15 @@ impl<T: Config> Module<T> {
 							  ExistenceRequirement::KeepAlive).expect("balance was already checked");
 	}
 
-	fn validate_votes(block_number: T::BlockNumber) {
+	fn validate_votes(_block_number: T::BlockNumber) {
 
 	}
 
-	fn process_votes(block_number: T::BlockNumber) {
+	fn process_votes(_block_number: T::BlockNumber) {
 
 	}
 
-	fn delete_requests(block_number: T::BlockNumber) {
+	fn delete_requests(_block_number: T::BlockNumber) {
 
 	}
 
@@ -554,7 +674,7 @@ impl<T: Config> Module<T> {
 			debug::debug!(target: "OWNERS", "send_commit_offchain too late to commit");
 			return ;
 		}
-		let reveal_at = max_block + u8_to_block::<T>(1) ;
+		let reveal_at = block_to_u32::<T>(max_block) + 1 ;
 
 		// Submit the commit transaction
 		let result = signer.send_signed_transaction(|_acct| Call::commit_verification(url.clone(), commit_hash.clone()));
@@ -563,62 +683,61 @@ impl<T: Config> Module<T> {
 				debug::error!(target: "OWNERS", "send_commit_offchain TRANSACTION FAILED. account id: {:?}", acc.id);
 			} else {
 				debug::debug!(target: "OWNERS", "send_commit_offchain SUCCESS");
-				Self::save_to_reveal_queue(url, reveal_at, vote, intro, proof, &salt) ;
+				OffchainCache::save_reveal_at_block(url, reveal_at, vote, intro, proof, &salt) ;
 			}
 		} else {
-			debug::error!(target: "OWNERS", "send_commit_offchain No local account to submit commit transaction");
+			debug::error!(target: "OWNERS", "send_commit_offchain No local account to submit transaction");
 		}
 	}
 
-	fn save_to_reveal_queue(url: &Vec<u8>, reveal_at: T::BlockNumber, vote: bool, intro: &Vec<u8>, proof: Option<&Vec<u8>>, salt: &Vec<u8>) {
-
-	}
-
-	fn send_reveal_offchain(block_number: T::BlockNumber) -> Result<(), Error<T>> {
-		// We retrieve a signer and check if it is valid.
-		//   Since this pallet only has one key in the keystore. We use `any_account()1 to
-		//   retrieve it. If there are multiple keys and we want to pinpoint it, `with_filter()` can be chained,
-		//   ref: https://substrate.dev/rustdocs/v3.0.0/frame_system/offchain/struct.Signer.html
+	fn send_reveal_offchain(url: &Vec<u8>, vote: bool, intro: &Vec<u8>, proof: &Vec<u8>, salt: &Vec<u8>) {
+		// Prepare the signer
 		let signer = Signer::<T, T::OwnersAppCrypto>::any_account();
-		let can_sign = signer.can_sign() ;
-		debug::debug!(target: "OWNERS", "send_reveal_offchain can_sign: {:?}", can_sign);
 
-		// Translating the current block number to number and submit it on-chain
-		let number: u64 = block_number.try_into().unwrap_or(0);
+		// Check that the Request is still pending
+		if !Requests::<T>::contains_key(url) {
+			debug::debug!(target: "OWNERS", "send_reveal_offchain request not found");
+			return ;
+		}
 
-		// `result` is in the type of `Option<(Account<T>, Result<(), ()>)>`. It is:
-		//   - `None`: no account is available for sending transaction
-		//   - `Some((account, Ok(())))`: transaction is successfully sent
-		//   - `Some((account, Err(())))`: error occured when sending the transaction
-		let result = signer.send_signed_transaction(|_acct| Call::test_tx(number));
+		// Check that it's still time to reveal
+		let request = Requests::<T>::get(url) ;
+		let request_block = request.0 ;
+		let current_block = Self::current_block_number() ;
+		let param1 = u8_to_block::<T>(NumBlocksToCommit::get()) ;
+		let param2 = u8_to_block::<T>(NumBlocksToReveal::get()) ;
+		let min_block = request_block + param1 ;
+		let max_block = request_block + param1 + param2 ;
+		let timing_ok = current_block>min_block && current_block<max_block ;
+		debug::debug!(target: "OWNERS", "send_reveal_offchain request_block: {:?}", request_block);
+		debug::debug!(target: "OWNERS", "send_reveal_offchain current_block: {:?}", current_block);
+		debug::debug!(target: "OWNERS", "send_reveal_offchain max_block: {:?}", current_block);
+		if !timing_ok {
+			debug::debug!(target: "OWNERS", "send_reveal_offchain too late to reveal");
+			return ;
+		}
 
-		// Display error if the signed tx fails.
+		// Submit the reveal transaction
+		let result = signer.send_signed_transaction(|_acct| {
+			Call::reveal_verification(url.clone(),
+									  vote,
+									  intro.clone(),
+									  proof.clone(),
+									  salt.clone())
+		});
 		if let Some((acc, res)) = result {
 			if res.is_err() {
-				debug::error!("failure: offchain_signed_tx: tx sent: {:?}", acc.id);
-				return Err(<Error<T>>::OffchainSignedTxError);
+				debug::error!(target: "OWNERS", "send_reveal_offchain TRANSACTION FAILED. account id: {:?}", acc.id);
+			} else {
+				debug::debug!(target: "OWNERS", "send_reveal_offchain SUCCESS");
 			}
-			// Transaction is sent successfully
-			return Ok(());
 		} else {
-			// The case result == `None`: no account is available for sending
-			debug::error!("No local account available");
-			return Err(<Error<T>>::NoLocalAcctForSigning);
+			debug::error!(target: "OWNERS", "send_reveal_offchain No local account to submit transaction");
 		}
 	}
 
 	fn current_block_number() -> T::BlockNumber {
 		<frame_system::Module<T>>::block_number()
-	}
-
-	fn key_reveals_for_block(block_number: T::BlockNumber) -> Vec<u8> {
-		block_number.using_encoded(|encoded_bn| {
-			REVEAL_QUEUE_PREFIX.clone().into_iter()
-				.chain(b"/".into_iter())
-				.chain(encoded_bn)
-				.copied()
-				.collect::<Vec<u8>>()
-		})
 	}
 
 }
@@ -867,6 +986,7 @@ decl_module! {
         // - Process the requests of the block and send commits
         // - Send reveals when it's time
 		fn offchain_worker(block_number: T::BlockNumber) {
+			// Check verifier status
 			debug::debug!(target: "OWNERS", "offchain_worker checking node account");
 			let account = Self::am_i_verifier() ;
 			if account.is_none() {
@@ -874,6 +994,9 @@ decl_module! {
 				return ;
 			}
 			debug::debug!(target: "OWNERS", "offchain_worker is ON");
+
+			// Process URL checks and send commits
+			debug::debug!(target: "OWNERS", "offchain_worker processing checks and sending commits...");
 			let requests = History::<T>::get(block_number) ;
 			for url in requests.iter() {
 				let request = Requests::<T>::get(&url) ;
@@ -881,9 +1004,19 @@ decl_module! {
 				let requester = request.1 ;
 				Self::check_url_offchain(&url, &requester, requested_at) ;
 			}
-			//let signer = Signer::<T, T::OwnersAppCrypto>::any_account();
-			//let number: u64 = 123 ;
-			//let result = signer.send_signed_transaction(|_acct| Call::test_tx(number));
+
+			// Send reveals
+			debug::debug!(target: "OWNERS", "offchain_worker sending reveals prepared some blocks ago...");
+			let block_number32 = block_to_u32::<T>(block_number) ;
+			let reveals = OffchainCache::take_reveal_list(block_number32) ;
+			for r in reveals {
+				let proof = match r.proof {
+					Some(x) => x,
+					None => sp_std::vec![]
+				} ;
+				Self::send_reveal_offchain(&r.url, r.vote, &r.intro, &proof, &r.salt) ;
+			}
+
 		}
 
 	}

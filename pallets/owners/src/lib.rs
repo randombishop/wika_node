@@ -24,7 +24,8 @@ use frame_system::{
 		AppCrypto,
 		SendSignedTransaction,
 		CreateSignedTransaction,
-		Signer
+		Signer,
+		SignMessage
 	}
 };
 
@@ -461,9 +462,15 @@ impl<T: Config> Module<T> {
 		// Check that the mark contains the address
 		debug::debug!(target: "OWNERS", "check_url_offchain requester: {:?}", &requester);
 		let address: [u8; 32] = requester.encode().try_into().expect("address is always 32") ;
-		let address = sp_std::str::from_utf8(&address) ;
+		let mut address_hex: [u8; 64] = [0; 64] ;
+		let conversion = hex::encode_to_slice(address, &mut address_hex) ;
+		if conversion.is_err() {
+			debug::debug!(target: "OWNERS", "check_url_offchain could not convert address to hex");
+			return ;
+		}
+		let address = sp_std::str::from_utf8(&address_hex) ;
 		if address.is_err() {
-			debug::debug!(target: "OWNERS", "check_url_offchain could not convert bytes to str");
+			debug::debug!(target: "OWNERS", "check_url_offchain could not convert address to str");
 			return ;
 		}
 		let address = address.unwrap() ;
@@ -521,16 +528,14 @@ impl<T: Config> Module<T> {
 
 		// Sign this part to get the salt
 		let signer = Signer::<T, T::OwnersAppCrypto>::any_account();
-		//let sign = signer.sign_message(&concat1) ;
-		//if sign.is_none() {
-		//	debug::debug!(target: "OWNERS", "send_commit_offchain unable to sign the parameters");
-		//	return ;
-		//}
-		//let (_account, salt) = sign.unwrap() ;
-		//let salt: Vec<u8> = salt.encode() ;
-		let salt: Vec<u8> = sp_std::vec![40,50,60] ;
-		let salt_str = sp_std::str::from_utf8(&salt) ;
-		debug::debug!(target: "OWNERS", "send_commit_offchain salt: {:?}", &salt_str);
+		let sign = signer.sign_message(&concat1) ;
+		if sign.is_none() {
+			debug::debug!(target: "OWNERS", "send_commit_offchain unable to sign the parameters");
+			return ;
+		}
+		let (_account, salt) = sign.unwrap() ;
+		let salt: Vec<u8> = salt.encode() ;
+		debug::debug!(target: "OWNERS", "send_commit_offchain salt: {:?}", &salt);
 
 		// Concatenate all 4 params now
 		let concat2: Vec<u8> = Self::concat_data2(vote, intro, proof, &salt) ;
@@ -728,6 +733,7 @@ decl_module! {
 			// Save the commit
 			let hash_array: [u8; 32] = hash.try_into().expect("length already checked") ;
 			Commits::<T>::insert(&url, &sender, hash_array);
+			debug::debug!(target: "OWNERS", "commit_verification commit saved!");
 
 			// Update verifier stats
 			let mut stats = Verifiers::<T>::take(&sender);
@@ -735,6 +741,7 @@ decl_module! {
 			let n_blocks:u32 = block_to_u32::<T>(current_block-request_block)  ;
 			stats.2[1] += n_blocks ;
 			Verifiers::<T>::insert(&sender, &stats);
+			debug::debug!(target: "OWNERS", "commit_verification updated stats: {:?}", &stats);
 
             // Emit an event that the commit was recorded.
             Self::deposit_event(RawEvent::UrlCheckCommitted(sender, url));

@@ -424,7 +424,7 @@ impl<T: Config> Module<T> {
 		return None ;
 	}
 
-	fn check_url_offchain(url: &Vec<u8>, requester: &T::AccountId) {
+	fn check_url_offchain(url: &Vec<u8>, requester: &T::AccountId, requested_at: T::BlockNumber) {
 		debug::debug!(target: "OWNERS", "check_url_offchain: {:?}", url);
 
 		// Fetch data from url
@@ -452,7 +452,7 @@ impl<T: Config> Module<T> {
 		let mark_idx = data.find(MARK_PREFIX) ;
 		if mark_idx.is_none() {
 			debug::debug!(target: "OWNERS", "check_url_offchain mark not found, voting NO");
-			Self::send_commit_offchain(url, false, &intro, None) ;
+			Self::send_commit_offchain(url, requested_at, false, &intro, None) ;
 			return ;
 		}
 		let mark_idx = mark_idx.unwrap() ;
@@ -478,14 +478,14 @@ impl<T: Config> Module<T> {
 		let address_idx = mark_str.find(&address) ;
 		if address_idx.is_none() {
 			debug::debug!(target: "OWNERS", "check_url_offchain mark address does not match, voting NO");
-			Self::send_commit_offchain(url, false, &intro, None) ;
+			Self::send_commit_offchain(url, requested_at, false, &intro, None) ;
 			return ;
 		}
 
 		// Valid mark found, let's vote YES
 		let proof: Vec<u8> = mark_str.into() ;
 		debug::debug!(target: "OWNERS", "check_url_offchain voting YES");
-		&Self::send_commit_offchain(url, true, &intro, Some(&proof)) ;
+		&Self::send_commit_offchain(url, requested_at, true, &intro, Some(&proof)) ;
 	}
 
 	fn concat_data1(vote: bool, intro: &Vec<u8>, proof: Option<&Vec<u8>>) -> Vec<u8> {
@@ -522,7 +522,7 @@ impl<T: Config> Module<T> {
 		ans
 	}
 
-	fn send_commit_offchain(url: &Vec<u8>, vote: bool, intro: &Vec<u8>, proof: Option<&Vec<u8>>) {
+	fn send_commit_offchain(url: &Vec<u8>, requested_at: T::BlockNumber, vote: bool, intro: &Vec<u8>, proof: Option<&Vec<u8>>) {
 		// Concatenate the 3 parameters
 		let concat1: Vec<u8> = Self::concat_data1(vote, intro, proof) ;
 
@@ -544,6 +544,18 @@ impl<T: Config> Module<T> {
 		let commit_hash: [u8; 32] = keccak_256(&concat2);
 		let commit_hash: Vec<u8> = commit_hash.into() ;
 
+
+		// Check that it's still time to commit
+		let current_block = Self::current_block_number() ;
+		debug::error!(target: "OWNERS", "send_commit_offchain current_block: {:?}", current_block);
+		let param = u8_to_block::<T>(NumBlocksToCommit::get()) ;
+		let max_block = requested_at + param ;
+		if current_block>=max_block {
+			debug::debug!(target: "OWNERS", "send_commit_offchain too late to commit");
+			return ;
+		}
+		let reveal_at = max_block + u8_to_block::<T>(1) ;
+
 		// Submit the commit transaction
 		let result = signer.send_signed_transaction(|_acct| Call::commit_verification(url.clone(), commit_hash.clone()));
 		if let Some((acc, res)) = result {
@@ -551,10 +563,15 @@ impl<T: Config> Module<T> {
 				debug::error!(target: "OWNERS", "send_commit_offchain TRANSACTION FAILED. account id: {:?}", acc.id);
 			} else {
 				debug::debug!(target: "OWNERS", "send_commit_offchain SUCCESS");
+				Self::save_to_reveal_queue(url, reveal_at, vote, intro, proof, &salt) ;
 			}
 		} else {
 			debug::error!(target: "OWNERS", "send_commit_offchain No local account to submit commit transaction");
 		}
+	}
+
+	fn save_to_reveal_queue(url: &Vec<u8>, reveal_at: T::BlockNumber, vote: bool, intro: &Vec<u8>, proof: Option<&Vec<u8>>, salt: &Vec<u8>) {
+
 	}
 
 	fn send_reveal_offchain(block_number: T::BlockNumber) -> Result<(), Error<T>> {
@@ -588,6 +605,10 @@ impl<T: Config> Module<T> {
 			debug::error!("No local account available");
 			return Err(<Error<T>>::NoLocalAcctForSigning);
 		}
+	}
+
+	fn current_block_number() -> T::BlockNumber {
+		<frame_system::Module<T>>::block_number()
 	}
 
 }
@@ -720,7 +741,7 @@ decl_module! {
 			ensure!(Requests::<T>::contains_key(&url), Error::<T>::UrlCheckNotFound) ;
 
 			// Check that it's a good time to receive commits
-			let current_block = <frame_system::Module<T>>::block_number();
+			let current_block = Self::current_block_number() ;
 			let request_block = Requests::<T>::get(&url).0 ;
 			let param = u8_to_block::<T>(NumBlocksToCommit::get()) ;
 			let max_block = request_block + param ;
@@ -845,8 +866,10 @@ decl_module! {
 			debug::debug!(target: "OWNERS", "offchain_worker is ON");
 			let requests = History::<T>::get(block_number) ;
 			for url in requests.iter() {
-				let requester = Requests::<T>::get(&url).1 ;
-				Self::check_url_offchain(&url, &requester) ;
+				let request = Requests::<T>::get(&url) ;
+				let requested_at = request.0 ;
+				let requester = request.1 ;
+				Self::check_url_offchain(&url, &requester, requested_at) ;
 			}
 			//let signer = Signer::<T, T::OwnersAppCrypto>::any_account();
 			//let number: u64 = 123 ;

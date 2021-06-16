@@ -684,7 +684,7 @@ impl<T: Config> Module<T> {
 			debug::debug!(target: "OWNERS", "send_commit_offchain too late to commit");
 			return ;
 		}
-		let reveal_at = block_to_u32::<T>(max_block) + 1 ;
+		let reveal_at = block_to_u32::<T>(max_block) ;
 
 		// Submit the commit transaction
 		let signer = Signer::<T, T::OwnersAppCrypto>::any_account();

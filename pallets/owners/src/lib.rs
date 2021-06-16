@@ -24,8 +24,7 @@ use frame_system::{
 		AppCrypto,
 		SendSignedTransaction,
 		CreateSignedTransaction,
-		Signer,
-		SignMessage
+		Signer
 	}
 };
 
@@ -462,7 +461,10 @@ decl_error! {
         NoLocalAcctForSigning,
 
         // 13
-        InvalidSalt
+        InvalidSalt,
+
+        // 14
+        CantRevealWithoutCommit
 	}
 }
 
@@ -528,14 +530,14 @@ impl<T: Config> Module<T> {
 
 	}
 
-	fn am_i_verifier() -> Option<PublicOf<T>> {
+	fn get_local_verifier() -> Option<[u8; 32]> {
 		let keys: Vec<PublicOf<T>> = PublicOf::<T>::all() ;
 		for x in keys {
 			let bytes: [u8; 32] = x.as_ref().try_into().expect("cant fail") ;
 			let account: T::AccountId = T::AccountId::decode(&mut &bytes[..]).expect("never fails") ;
 			debug::debug!(target: "OWNERS", "offchain_worker account: {:?}", &account);
 			if Self::is_verifier_enabled(&account) {
-				return Some(x) ;
+				return Some(bytes) ;
 			}
 		}
 		return None ;
@@ -642,16 +644,27 @@ impl<T: Config> Module<T> {
 	fn send_commit_offchain(url: &Vec<u8>, requested_at: T::BlockNumber, vote: bool, intro: &Vec<u8>, proof: Option<&Vec<u8>>) {
 		// Concatenate the 3 parameters
 		let concat1: Vec<u8> = Self::concat_data1(vote, intro, proof) ;
+		debug::debug!(target: "OWNERS", "send_commit_offchain concat1.len(): {:?}", concat1.len());
+		debug::debug!(target: "OWNERS", "send_commit_offchain concat1: {:?}", &concat1);
 
 		// Sign this part to get the salt
-		let signer = Signer::<T, T::OwnersAppCrypto>::any_account();
-		let sign = signer.sign_message(&concat1) ;
-		if sign.is_none() {
-			debug::debug!(target: "OWNERS", "send_commit_offchain unable to sign the parameters");
+		let verifier = Self::get_local_verifier() ;
+		if verifier.is_none() {
+			debug::debug!(target: "OWNERS", "send_commit_offchain unable to find verifier");
 			return ;
 		}
-		let (_account, salt) = sign.unwrap() ;
+		let verifier = verifier.unwrap() ;
+		let verifier = sp_core::sr25519::Public::from_raw(verifier) ;
+		let sign = sp_io::crypto::sr25519_sign(KEY_TYPE, &verifier, &concat1) ;
+		if sign.is_none() {
+			debug::debug!(target: "OWNERS", "send_commit_offchain unable to sign params");
+			return ;
+		}
+		let salt = sign.unwrap() ;
+		debug::debug!(target: "OWNERS", "send_commit_offchain salt as signature: {:?}", &salt);
 		let salt: Vec<u8> = salt.encode() ;
+		//let salt: Vec<u8> = salt[0..64].into() ;
+		debug::debug!(target: "OWNERS", "send_commit_offchain salt.len: {:?}", salt.len());
 		debug::debug!(target: "OWNERS", "send_commit_offchain salt: {:?}", &salt);
 
 		// Concatenate all 4 params now
@@ -674,6 +687,7 @@ impl<T: Config> Module<T> {
 		let reveal_at = block_to_u32::<T>(max_block) + 1 ;
 
 		// Submit the commit transaction
+		let signer = Signer::<T, T::OwnersAppCrypto>::any_account();
 		let result = signer.send_signed_transaction(|_acct| Call::commit_verification(url.clone(), commit_hash.clone()));
 		if let Some((acc, res)) = result {
 			if res.is_err() {
@@ -708,7 +722,7 @@ impl<T: Config> Module<T> {
 		let timing_ok = current_block>min_block && current_block<max_block ;
 		debug::debug!(target: "OWNERS", "send_reveal_offchain request_block: {:?}", request_block);
 		debug::debug!(target: "OWNERS", "send_reveal_offchain current_block: {:?}", current_block);
-		debug::debug!(target: "OWNERS", "send_reveal_offchain max_block: {:?}", current_block);
+		debug::debug!(target: "OWNERS", "send_reveal_offchain max_block: {:?}", max_block);
 		if !timing_ok {
 			debug::debug!(target: "OWNERS", "send_reveal_offchain too late to reveal");
 			return ;
@@ -936,23 +950,29 @@ decl_module! {
 			ensure!(timing_ok, Error::<T>::OffTimeToReveal) ;
 
             // Check that the result was previously committed
-            ensure!(Commits::<T>::contains_key(&url, &sender), Error::<T>::VerifierNotRegistered) ;
+            ensure!(Commits::<T>::contains_key(&url, &sender), Error::<T>::CantRevealWithoutCommit) ;
 
-            // Check that the salt is a valid signature
-            let account_bytes: [u8; 32] = sender.encode().try_into().expect("account len is 32") ;
-            let account_public: sp_core::sr25519::Public = sp_core::sr25519::Public::from_raw(account_bytes) ;
-			let signature_bytes: Result<[u8; 64],_> = salt.clone().try_into() ;
-			ensure!(signature_bytes.is_ok(), Error::<T>::InvalidSalt) ;
-
-			// Check that the salt is actually the signature for the first 3 params
-			let signature_bytes: [u8; 64] = signature_bytes.unwrap() ;
-            let signature = sp_core::sr25519::Signature::from_raw(signature_bytes) ;
+            // Concat first 3 params
 			let proof_option = match vote {
             	true => Some(&proof),
             	false => None
             } ;
             let concat1 = Self::concat_data1(vote, &intro, proof_option) ;
-            debug::debug!(target: "OWNERS", "reveal_verification concat: {:?}", &concat1);
+            debug::debug!(target: "OWNERS", "reveal_verification concat1.len(): {:?}", concat1.len());
+            debug::debug!(target: "OWNERS", "reveal_verification concat1: {:?}", &concat1);
+
+			// Check that the salt is a valid signature
+            let account_bytes: [u8; 32] = sender.encode().try_into().expect("account len is 32") ;
+            let account_public: sp_core::sr25519::Public = sp_core::sr25519::Public::from_raw(account_bytes) ;
+            debug::debug!(target: "OWNERS", "reveal_verification account_public: {:?}", &account_public);
+            debug::debug!(target: "OWNERS", "reveal_verification salt.len(): {:?}", salt.len());
+			let signature_bytes: Result<[u8; 64],_> = salt.clone().try_into() ;
+			ensure!(signature_bytes.is_ok(), Error::<T>::InvalidSalt) ;
+			let signature_bytes: [u8; 64] = signature_bytes.unwrap() ;
+            let signature = sp_core::sr25519::Signature::from_raw(signature_bytes) ;
+            debug::debug!(target: "OWNERS", "reveal_verification salt as signature: {:?}", &signature);
+
+            // Check that the salt is actually the signature for the first 3 params
 			let valid_salt = sp_io::crypto::sr25519_verify(&signature, &concat1, &account_public) ;
 			ensure!(valid_salt, Error::<T>::InvalidSalt) ;
 
@@ -987,7 +1007,7 @@ decl_module! {
 			// Check verifier status
 			debug::debug!(target: "OWNERS", "offchain_worker checking node account");
 
-			let account = Self::am_i_verifier() ;
+			let account = Self::get_local_verifier() ;
 			if account.is_none() {
 				debug::debug!(target: "OWNERS", "offchain_worker is OFF");
 				return ;
@@ -995,7 +1015,7 @@ decl_module! {
 			debug::debug!(target: "OWNERS", "offchain_worker is ON");
 
 			// Process URL checks and send commits
-			debug::debug!(target: "OWNERS", "offchain_worker processing checks and sending commits...");
+			debug::debug!(target: "OWNERS", "offchain_worker *** processing checks and commits ***");
 			let requests = History::<T>::get(block_number) ;
 			for url in requests.iter() {
 				let request = Requests::<T>::get(&url) ;
@@ -1003,9 +1023,10 @@ decl_module! {
 				let requester = request.1 ;
 				Self::check_url_offchain(&url, &requester, requested_at) ;
 			}
+			debug::debug!(target: "OWNERS", "offchain_worker *** checks and commits DONE ***");
 
 			// Send reveals
-			debug::debug!(target: "OWNERS", "offchain_worker sending reveals prepared some blocks ago...");
+			debug::debug!(target: "OWNERS", "offchain_worker *** processing reveals ***");
 			let block_number32 = block_to_u32::<T>(block_number) ;
 			let reveals = OffchainCache::get_reveal_list(block_number32) ;
 			debug::debug!(target: "OWNERS", "offchain_worker num reveals found: {:?}", reveals.len());
@@ -1017,6 +1038,7 @@ decl_module! {
 				} ;
 				Self::send_reveal_offchain(&r.url, r.vote, &r.intro, &proof, &r.salt) ;
 			}
+			debug::debug!(target: "OWNERS", "offchain_worker *** reveals DONE ***");
 
 			// Finish
 			debug::debug!(target: "OWNERS", "offchain_worker DONE");

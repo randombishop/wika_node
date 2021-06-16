@@ -715,7 +715,10 @@ impl<T: Config> Module<T> {
 		let param2 = u8_to_block::<T>(NumBlocksToReveal::get()) ;
 		let min_block = request_block + param1 ;
 		let max_block = request_block + param1 + param2 ;
-		let timing_ok = current_block>min_block && current_block<max_block ;
+		let timing_ok = current_block>=min_block && current_block<max_block ;
+		// Note that at this point current_block is already finalized so it's ok to trigger the tx now,
+		// it can only be included in next block, thus current_block>=min_block
+		// and not >
 		debug::debug!(target: "OWNERS", "send_reveal_offchain request_block: {:?}", request_block);
 		debug::debug!(target: "OWNERS", "send_reveal_offchain current_block: {:?}", current_block);
 		debug::debug!(target: "OWNERS", "send_reveal_offchain max_block: {:?}", max_block);
@@ -780,7 +783,7 @@ decl_module! {
 			debug::debug!(target: "OWNERS", "on_initialize");
 
 			// Aggregate votes for previous requests
-			Self::aggregate_votes() ;
+			Self::aggregate_votes(current_block) ;
 
 			100_000
 		}
@@ -902,7 +905,7 @@ decl_module! {
 			let request_block = Requests::<T>::get(&url).0 ;
 			let param = u8_to_block::<T>(NumBlocksToCommit::get()) ;
 			let max_block = request_block + param ;
-			let timing_ok = current_block>request_block && current_block<max_block ;
+			let timing_ok = current_block>request_block && current_block<=max_block ;
 			debug::debug!(target: "OWNERS", "commit_verification current_block: {:?}", &current_block);
 			debug::debug!(target: "OWNERS", "commit_verification request_block: {:?}", &request_block);
 			debug::debug!(target: "OWNERS", "commit_verification max_block: {:?}", &max_block);
@@ -966,7 +969,7 @@ decl_module! {
 			let param2 = u8_to_block::<T>(NumBlocksToReveal::get()) ;
 			let min_block = request_block + param1 ;
 			let max_block = request_block + param1 + param2 ;
-			let timing_ok = current_block>min_block && current_block<max_block ;
+			let timing_ok = current_block>min_block && current_block<=max_block ;
 			debug::debug!(target: "OWNERS", "reveal_verification current_block: {:?}", &current_block);
 			debug::debug!(target: "OWNERS", "reveal_verification min_block: {:?}", &min_block);
 			debug::debug!(target: "OWNERS", "reveal_verification max_block: {:?}", &max_block);

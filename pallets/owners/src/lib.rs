@@ -854,20 +854,28 @@ impl<T: Config> Module<T> {
 			let (_, owner) = Requests::<T>::get(&url) ;
 			Owners::<T>::insert(&url, owner) ;
 		}
-
+		debug::debug!(target: "OWNERS", "aggregate_votes_for_request DONE");
 	}
 
 	fn clean_up(current_block: T::BlockNumber) {
-		debug::debug!(target: "OWNERS", "aggregate_votes clean_up: {:?}", current_block);
+		debug::debug!(target: "OWNERS", "clean_up current_block: {:?}", current_block);
 		let param1 = u8_to_block::<T>(NumBlocksToCommit::get()) ;
 		let param2 = u8_to_block::<T>(NumBlocksToReveal::get()) ;
 		let param3 = u8_to_block::<T>(NumBlocksToDelete::get()) ;
 		let delta = param1+param2+param3+u8_to_block::<T>(1) ;
 		if current_block>delta {
 			let block = current_block - delta ;
-			debug::debug!(target: "OWNERS", "aggregate_votes block: {:?}", block);
-
+			debug::debug!(target: "OWNERS", "clean_up block: {:?}", block);
+			let urls = History::<T>::take(block) ;
+			for url in urls {
+				debug::debug!(target: "OWNERS", "clean_up url: {:?}", sp_std::str::from_utf8(&url));
+				Requests::<T>::remove(&url) ;
+				Commits::<T>::remove_prefix(&url) ;
+				Reveals::<T>::remove_prefix(&url) ;
+				Results::remove(&url) ;
+			}
 		}
+		debug::debug!(target: "OWNERS", "clean_up DONE");
 	}
 
 	fn current_block_number() -> T::BlockNumber {

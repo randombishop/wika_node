@@ -763,6 +763,8 @@ impl<T: Config> Module<T> {
 	}
 
 	fn aggregate_votes_for_request(url: Vec<u8>) {
+		debug::debug!(target: "OWNERS", "aggregate_votes_for_request url: {:?}", sp_std::str::from_utf8(&url));
+		let reveals = Reveals::<T>::iter_prefix(url).collect::<Vec<(T::AccountId, (bool, Vec<u8>, Vec<u8>))>>() ;
 
 	}
 

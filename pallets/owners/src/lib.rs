@@ -7,7 +7,8 @@
 
 use sp_std::{
 	vec::Vec,
-	convert::TryInto
+	convert::TryInto,
+	collections::btree_map::BTreeMap
 };
 
 use frame_support::{
@@ -129,7 +130,7 @@ const REVEAL_QUEUE_PREFIX: &[u8] = b"ownr/r/";
 
 
 
-// Utility functions to convert from different types
+// Utility functions
 // -------------------------------------------------
 
 fn u128_to_balance<T:Config>(input: u128) -> BalanceOf<T> {
@@ -146,6 +147,30 @@ fn block_to_u32<T:Config>(input: T::BlockNumber) -> u32 {
 		Err(_) => 0
 	}
 }
+
+fn find_majority<K,V: Ord>(list: &Vec<(K, V)>) -> Option<(&V,u32)> {
+	let mut map = BTreeMap::new() ;
+	for (_, v) in list {
+		let count: Option<&u32> = map.get(&v) ;
+		if count.is_none() {
+			map.insert(v, 1) ;
+		} else {
+			let update = count.unwrap() + 1 ;
+			map.insert(v, update) ;
+		}
+	}
+	let majority = map
+		.iter()
+		.max_by(|a, b| a.1.cmp(&b.1)) ;
+	if majority.is_none() {
+		return None ;
+	} else {
+		let (k,v) = majority.unwrap() ;
+		return Some((*k,*v)) ;
+	}
+}
+
+
 
 
 
@@ -328,6 +353,18 @@ impl OffchainCache {
 // Onchain Persistent data
 // -------------------------------------------------
 
+#[derive(Encode, Decode, Default, Clone, PartialEq, Debug)]
+struct VerifierStats {
+	commits: u32 ,
+	commits_time: u32 ,
+	reveals: u32 ,
+	reveals_time: u32 ,
+	votes_valid: u32 ,
+	votes_yes: u32 ,
+	votes_correct: u32
+}
+
+
 decl_storage! {
 	trait Store for Module<T: Config> as Owners {
 		// Total number of URLs registered
@@ -350,19 +387,17 @@ decl_storage! {
     	// are deleted
     	NumBlocksToDelete: u8 = 5 ;
 
+		// Prct of identical reveals to validate a round of voting
+    	PrctNeededForAgreement: u8 = 66 ;
+
+		// Minimum number of verifiers required to approve ownership
+		MajorityMin: u32 = 1 ;
+
     	// Registered verifiers
     	// 1. Block at which they were registered
     	// 2. Enabled true/false
-    	// 2. Array of stats in following order
-    	//stats[0]: number of commits
-		//stats[1]: total blocks waited to commit
-		//stats[2]: number of reveals
-		//stats[3]: total blocks waited to reveal, after commits were closed
-		//stats[4]: number of valid votes
-		//stats[5]: number of YES votes
-		//stats[6]: number of NO votes
-		//stats[7]: number of votes against the majority
-    	Verifiers: map hasher(identity) T::AccountId => (T::BlockNumber, bool, [u32; 8]) ;
+    	// 3. Stats
+    	Verifiers: map hasher(identity) T::AccountId => (T::BlockNumber, bool, VerifierStats) ;
 
     	// List of requests received by block
     	History: map hasher(identity) T::BlockNumber => Vec<Vec<u8>> ;
@@ -388,12 +423,13 @@ decl_storage! {
     	// Verification result
     	// - Num votes
     	// - Num votes YES
+    	// - Num votes majority
     	// - First characters of the webpage
     	// - Mark found on the page
-    	Results: map hasher(blake2_128_concat) Vec<u8> => (u32, u32, Vec<u8>, Vec<u8>) ;
+    	Results: map hasher(blake2_128_concat) Vec<u8> => (u32, u32, u32, Vec<u8>, Vec<u8>) ;
 
     	// Final URL-Account map representing ownership
-    	Authors: map hasher(blake2_128_concat) Vec<u8> => T::AccountId ;
+    	Owners: map hasher(blake2_128_concat) Vec<u8> => T::AccountId ;
 	}
 }
 
@@ -764,8 +800,74 @@ impl<T: Config> Module<T> {
 
 	fn aggregate_votes_for_request(url: Vec<u8>) {
 		debug::debug!(target: "OWNERS", "aggregate_votes_for_request url: {:?}", sp_std::str::from_utf8(&url));
-		let reveals = Reveals::<T>::iter_prefix(url).collect::<Vec<(T::AccountId, (bool, Vec<u8>, Vec<u8>))>>() ;
+		let reveals = Reveals::<T>::iter_prefix(&url).collect::<Vec<(T::AccountId, (bool, Vec<u8>, Vec<u8>))>>() ;
+		let total: u32 = reveals.len().try_into().expect("should always fit in 32") ;
+		debug::debug!(target: "OWNERS", "aggregate_votes_for_request total: {:?}", total);
+		if total==0 {
+			return ;
+		}
 
+		// Define majority
+		let majority = find_majority(&reveals).unwrap() ;
+		let ((vote, intro, proof), count_majority) = majority ;
+		debug::debug!(target: "OWNERS", "aggregate_votes_for_request majority count_majority: {:?}", count_majority);
+		let prct: u32 = count_majority*100/total ;
+		debug::debug!(target: "OWNERS", "aggregate_votes_for_request majority prct: {:?}", prct);
+
+		// Count number of yes votes
+		let mut count_yes: u32 = 0 ;
+		for (_,(v,_,_)) in &reveals {
+			if *v { count_yes += 1 ; }
+		}
+		debug::debug!(target: "OWNERS", "aggregate_votes_for_request majority count_yes: {:?}", count_yes);
+
+		// Save the results
+		let result: (u32, u32, u32, &Vec<u8>, &Vec<u8>) = (total, count_yes, count_majority, intro, proof) ;
+		Results::insert(&url, result) ;
+
+		// Update verifiers' stats if prct majority passed the bar
+		// If not, these votes won't count in the verifier stats
+		let bar: u32 = PrctNeededForAgreement::get().into() ;
+		if prct>bar {
+			debug::debug!(target: "OWNERS", "aggregate_votes_for_request votes are valid");
+			for (account, (r_vote, r_intro, r_proof)) in &reveals {
+				let mut stats = Verifiers::<T>::get(account).2 ;
+				stats.votes_valid += 1 ;
+				if *r_vote {
+					stats.votes_yes += 1 ;
+				}
+				if (r_vote, r_intro, r_proof) == (vote, intro, proof) {
+					stats.votes_correct += 1 ;
+				}
+			}
+		}
+
+		// Register new ownership if approved
+		// Rules of approval:
+		// - Majority voted YES
+		// - Majority represents at least PrctNeededForAgreement
+		// - Majority is at least MajorityMin
+		let majority_min: u32 = MajorityMin::get().into() ;
+		let ok = *vote && prct>bar && count_majority>majority_min ;
+		if ok {
+			debug::debug!(target: "OWNERS", "aggregate_votes_for_request ownership approved") ;
+			let (_, owner) = Requests::<T>::get(&url) ;
+			Owners::<T>::insert(&url, owner) ;
+		}
+
+	}
+
+	fn clean_up(current_block: T::BlockNumber) {
+		debug::debug!(target: "OWNERS", "aggregate_votes clean_up: {:?}", current_block);
+		let param1 = u8_to_block::<T>(NumBlocksToCommit::get()) ;
+		let param2 = u8_to_block::<T>(NumBlocksToReveal::get()) ;
+		let param3 = u8_to_block::<T>(NumBlocksToDelete::get()) ;
+		let delta = param1+param2+param3+u8_to_block::<T>(1) ;
+		if current_block>delta {
+			let block = current_block - delta ;
+			debug::debug!(target: "OWNERS", "aggregate_votes block: {:?}", block);
+
+		}
 	}
 
 	fn current_block_number() -> T::BlockNumber {
@@ -783,10 +885,10 @@ decl_module! {
 		// Process previous requests
 		fn on_initialize(current_block: T::BlockNumber) -> Weight {
 			debug::debug!(target: "OWNERS", "on_initialize");
-
 			// Aggregate votes for previous requests
 			Self::aggregate_votes(current_block) ;
-
+			// Clean up history, requests, commits, reveals and results
+			Self::clean_up(current_block) ;
 			100_000
 		}
 
@@ -810,7 +912,7 @@ decl_module! {
 
 			// Add account as a new verifier
 			let current_block = <frame_system::Module<T>>::block_number();
-			let stats:[u32;8] = [0;8];
+			let stats:VerifierStats = VerifierStats::default() ;
 			let verifier = (current_block, true, stats) ;
 			Verifiers::<T>::insert(&account, verifier);
 
@@ -920,9 +1022,9 @@ decl_module! {
 
 			// Update verifier stats
 			let mut stats = Verifiers::<T>::take(&sender);
-			stats.2[0] += 1 ;
+			stats.2.commits += 1 ;
 			let n_blocks:u32 = block_to_u32::<T>(current_block-request_block)  ;
-			stats.2[1] += n_blocks ;
+			stats.2.commits_time += n_blocks ;
 			Verifiers::<T>::insert(&sender, &stats);
 			debug::debug!(target: "OWNERS", "commit_verification updated stats: {:?}", &stats);
 
@@ -1018,9 +1120,9 @@ decl_module! {
 
 			// Update verifier stats
 			let mut stats = Verifiers::<T>::take(&sender);
-			stats.2[2] += 1 ;
+			stats.2.reveals += 1 ;
 			let n_blocks:u32 = block_to_u32::<T>(current_block-min_block) ;
-			stats.2[3] += n_blocks ;
+			stats.2.reveals_time += n_blocks ;
 			Verifiers::<T>::insert(&sender, &stats);
 			debug::debug!(target: "OWNERS", "reveal_verification updated stats: {:?}", &stats);
 

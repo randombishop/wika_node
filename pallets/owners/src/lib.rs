@@ -258,12 +258,6 @@ impl OffchainCache {
 		ans
 	}
 
-	fn delete_list(key: &Vec<u8>) {
-		let mut cache = StorageValueRef::persistent(key);
-		cache.clear() ;
-		debug::debug!(target: "OWNERS", "OffchainCache list deleted: {:?}", sp_std::str::from_utf8(&key));
-	}
-
 	fn add_reveal_to_existing_list(key: &[u8], item: RevealItem) {
 		let cache = StorageValueRef::persistent(key) ;
 		let update = cache.mutate(|o: Option<Option<Vec<RevealItem>>>| {
@@ -315,6 +309,13 @@ impl OffchainCache {
 		}
 	}
 
+	pub fn delete_reveal_list(block_number: u32) {
+		let key = Self::key_reveals_at_block(block_number) ;
+		let mut cache = StorageValueRef::persistent(&key);
+		cache.clear() ;
+		debug::debug!(target: "OWNERS", "OffchainCache list deleted: {:?}", sp_std::str::from_utf8(&key));
+	}
+
 }
 
 
@@ -357,7 +358,7 @@ decl_storage! {
 		//stats[1]: total blocks waited to commit
 		//stats[2]: number of reveals
 		//stats[3]: total blocks waited to reveal, after commits were closed
-		//stats[4]: number of valid reveals
+		//stats[4]: number of valid votes
 		//stats[5]: number of YES votes
 		//stats[6]: number of NO votes
 		//stats[7]: number of votes against the majority
@@ -380,9 +381,16 @@ decl_storage! {
 
     	// Reveal data
     	// - Vote Yes or No
-    	// - keccak_256 of the first 128 characters of the webpage
-    	// - keccak_256 of the 128 characters containing the mark
-    	Reveals: double_map hasher(blake2_128_concat) Vec<u8>, hasher(identity) T::AccountId => (bool, [u8; 32], [u8; 32]) ;
+    	// - First characters of the webpage
+    	// - Mark found on the page
+    	Reveals: double_map hasher(blake2_128_concat) Vec<u8>, hasher(identity) T::AccountId => (bool, Vec<u8>, Vec<u8>) ;
+
+    	// Verification result
+    	// - Num votes
+    	// - Num votes YES
+    	// - First characters of the webpage
+    	// - Mark found on the page
+    	Results: map hasher(blake2_128_concat) Vec<u8> => (u32, u32, Vec<u8>, Vec<u8>) ;
 
     	// Final URL-Account map representing ownership
     	Authors: map hasher(blake2_128_concat) Vec<u8> => T::AccountId ;
@@ -516,18 +524,6 @@ impl<T: Config> Module<T> {
 							  &Self::pot_id(),
 							  amount,
 							  ExistenceRequirement::KeepAlive).expect("balance was already checked");
-	}
-
-	fn validate_votes(_block_number: T::BlockNumber) {
-
-	}
-
-	fn process_votes(_block_number: T::BlockNumber) {
-
-	}
-
-	fn delete_requests(_block_number: T::BlockNumber) {
-
 	}
 
 	fn get_local_verifier() -> Option<[u8; 32]> {
@@ -747,6 +743,26 @@ impl<T: Config> Module<T> {
 		}
 	}
 
+	fn aggregate_votes(current_block: T::BlockNumber) {
+		debug::debug!(target: "OWNERS", "aggregate_votes current_block: {:?}", current_block);
+		let param1 = u8_to_block::<T>(NumBlocksToCommit::get()) ;
+		let param2 = u8_to_block::<T>(NumBlocksToReveal::get()) ;
+		let delta = param1+param2+u8_to_block::<T>(1) ;
+		if current_block>delta {
+			let block = current_block - delta ;
+			debug::debug!(target: "OWNERS", "aggregate_votes block: {:?}", block);
+			let requests = History::<T>::get(block) ;
+			debug::debug!(target: "OWNERS", "aggregate_votes requests.len(): {:?}", requests.len());
+			for url in requests {
+				Self::aggregate_votes_for_request(url) ;
+			}
+		}
+	}
+
+	fn aggregate_votes_for_request(url: Vec<u8>) {
+
+	}
+
 	fn current_block_number() -> T::BlockNumber {
 		<frame_system::Module<T>>::block_number()
 	}
@@ -761,10 +777,11 @@ decl_module! {
 
 		// Process previous requests
 		fn on_initialize(current_block: T::BlockNumber) -> Weight {
-			debug::debug!(target: "OWNERS", "on_initialize processing previous requests...");
-			&Self::validate_votes(current_block) ;
-			&Self::process_votes(current_block) ;
-			&Self::delete_requests(current_block) ;
+			debug::debug!(target: "OWNERS", "on_initialize");
+
+			// Aggregate votes for previous requests
+			Self::aggregate_votes() ;
+
 			100_000
 		}
 
@@ -928,8 +945,15 @@ decl_module! {
 			let request_block = request.0 ;
 			let request_account = request.1 ;
 
-			// If vote is positive, check that the proof contains the account address
+			// Check intro length
+			ensure!(intro.len()==INTRO_LENGTH, Error::<T>::InvalidProofOfOwnership) ;
+
+			// If vote is positive
 			if vote {
+				// Check that the proof has the correct length
+				ensure!(proof.len()==MARK_LENGTH, Error::<T>::InvalidProofOfOwnership) ;
+
+				// Check that the proof has cocontains the account address
 				debug::debug!(target: "OWNERS", "reveal_verification request_account: {:?}", &request_account);
 				debug::debug!(target: "OWNERS", "reveal_verification proof: {:?}", &proof);
 				// TODO
@@ -984,9 +1008,7 @@ decl_module! {
             ensure!(reveal_hash==commit, Error::<T>::MismatchBetweenCommitAndReveal) ;
 
 			// Save the reveal
-			let intro_hash = keccak_256(&intro);
-			let proof_hash = keccak_256(&proof);
-			Reveals::<T>::insert(&url, &sender, (vote, intro_hash, proof_hash));
+			Reveals::<T>::insert(&url, &sender, (vote, intro, proof));
 			debug::debug!(target: "OWNERS", "reveal_verification reveal saved!");
 
 			// Update verifier stats
@@ -1040,6 +1062,7 @@ decl_module! {
 				} ;
 				Self::send_reveal_offchain(&r.url, r.vote, &r.intro, &proof, &r.salt) ;
 			}
+			OffchainCache::delete_reveal_list(block_number32) ;
 			debug::debug!(target: "OWNERS", "offchain_worker *** reveals DONE ***");
 
 			// Finish

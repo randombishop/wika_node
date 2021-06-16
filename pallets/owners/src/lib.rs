@@ -987,6 +987,7 @@ decl_module! {
 			let intro_hash = keccak_256(&intro);
 			let proof_hash = keccak_256(&proof);
 			Reveals::<T>::insert(&url, &sender, (vote, intro_hash, proof_hash));
+			debug::debug!(target: "OWNERS", "reveal_verification reveal saved!");
 
 			// Update verifier stats
 			let mut stats = Verifiers::<T>::take(&sender);
@@ -994,6 +995,7 @@ decl_module! {
 			let n_blocks:u32 = block_to_u32::<T>(current_block-min_block) ;
 			stats.2[3] += n_blocks ;
 			Verifiers::<T>::insert(&sender, &stats);
+			debug::debug!(target: "OWNERS", "reveal_verification updated stats: {:?}", &stats);
 
             // Emit an event that the commit was recorded.
             Self::deposit_event(RawEvent::UrlCheckRevealed(sender, url));

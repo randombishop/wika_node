@@ -56,6 +56,7 @@ use codec::{Encode} ;
 use frame_system::offchain::AppCrypto ;
 
 // Import the template pallet.
+pub use pallet_likes;
 pub use pallet_owners;
 
 

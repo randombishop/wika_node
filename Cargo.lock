@@ -3788,6 +3788,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-likes"
+version = "3.0.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "parity-scale-codec",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "pallet-owners"
 version = "3.0.0"
 dependencies = [
@@ -8143,6 +8155,7 @@ dependencies = [
  "pallet-aura",
  "pallet-balances",
  "pallet-grandpa",
+ "pallet-likes",
  "pallet-owners",
  "pallet-randomness-collective-flip",
  "pallet-sudo",

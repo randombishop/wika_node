@@ -1,12 +1,12 @@
 [package]
-authors = ['Substrate DevHub <https://github.com/substrate-developer-hub>']
-description = 'FRAME pallet template for defining custom runtime logic.'
+authors = ['Wika Network <https://wika.network>']
+description = 'FRAME pallet to manage URL ownership.'
 edition = '2018'
-homepage = 'https://substrate.dev'
+homepage = 'https://wika.network'
 license = 'Unlicense'
 name = 'pallet-owners'
 readme = 'README.md'
-repository = 'https://github.com/substrate-developer-hub/substrate-node-template/'
+repository = 'https://github.com/randombishop/wika_node'
 version = '3.0.0'
 
 [package.metadata.docs.rs]

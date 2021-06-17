@@ -8183,6 +8183,10 @@ dependencies = [
 [[package]]
 name = "wika-traits"
 version = "3.0.0"
+dependencies = [
+ "frame-system",
+ "sp-std",
+]
 
 [[package]]
 name = "winapi"

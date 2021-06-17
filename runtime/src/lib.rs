@@ -367,25 +367,6 @@ parameter_types! {
 
 
 
-
-// Pallet Likes
-// -------------------
-
-parameter_types! {
-	pub const MaxLikes: u8 = 100;
-}
-
-
-impl pallet_likes::Config for Runtime {
-	type Event = Event;
-	type Currency = pallet_balances::Module<Runtime>;
-	type MaxLengthURL = MaxLengthURL;
-	type MaxLikes = MaxLikes;
-}
-
-
-
-
 // Pallet Owners
 // -------------------
 
@@ -403,6 +384,23 @@ impl pallet_owners::Config for Runtime {
 	type NumChecksRequired = NumChecksRequired ;
 }
 
+
+
+// Pallet Likes
+// -------------------
+
+parameter_types! {
+	pub const MaxLikes: u8 = 100;
+}
+
+
+impl pallet_likes::Config for Runtime {
+	type Event = Event;
+	type Currency = pallet_balances::Module<Runtime>;
+	type MaxLengthURL = MaxLengthURL;
+	type MaxLikes = MaxLikes;
+	type OwnershipRegistry = pallet_owners::Module<Runtime> ;
+}
 
 
 

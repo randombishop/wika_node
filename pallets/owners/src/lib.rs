@@ -58,7 +58,7 @@ use hex ;
 
 use numtoa::NumToA ;
 
-use wika_traits ;
+use wika_traits::OwnershipRegistry ;
 
 
 
@@ -97,7 +97,7 @@ pub mod crypto {
 // Trait, types and constants used by this pallet
 // -------------------------------------------------
 
-pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>> {
+pub trait Config: frame_system::Config + CreateSignedTransaction<Call<Self>>  {
 	type OwnersAppCrypto: AppCrypto<Self::Public, Self::Signature>;
 	type OwnersPublic: RuntimeAppPublic + Debug + AsRef<[u8]> ;
 	type Call: From<Call<Self>>;
@@ -521,6 +521,17 @@ decl_error! {
 // -------------------------------------------------
 
 
+impl<T:Config> OwnershipRegistry<T> for Module<T> {
+
+	fn get_owner(url: &Vec<u8>) -> T::AccountId {
+		Owners::<T>::get(url)
+	}
+
+}
+
+
+
+
 impl<T: Config> Module<T> {
 
 	fn pot_id() -> T::AccountId {
@@ -883,6 +894,9 @@ impl<T: Config> Module<T> {
 	}
 
 }
+
+
+
 
 
 decl_module! {

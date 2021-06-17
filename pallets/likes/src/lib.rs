@@ -13,7 +13,7 @@ use sp_runtime::{
 	traits::AccountIdConversion
 };
 
-use wika_traits ;
+use wika_traits::OwnershipRegistry ;
 
 
 
@@ -24,6 +24,7 @@ pub trait Config: frame_system::Config {
 	type Currency: Currency<Self::AccountId> ;
 	type MaxLengthURL: Get<u8> ;
 	type MaxLikes: Get<u8> ;
+	type OwnershipRegistry: OwnershipRegistry<Self> ;
 }
 
 type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance ;

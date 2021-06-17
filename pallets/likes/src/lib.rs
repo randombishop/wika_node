@@ -13,6 +13,8 @@ use sp_runtime::{
 	traits::AccountIdConversion
 };
 
+use wika_traits ;
+
 
 
 /// Configure the pallet by specifying the parameters and types on which it depends.

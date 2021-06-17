@@ -25,6 +25,8 @@ sp-application-crypto = {default-features = false, version = '3.0.0', path = '..
 sp-io = {default-features = false, version = '3.0.0', path = '../../../substrate/primitives/io'}
 sp-runtime = {default-features = false, version = '3.0.0', path = '../../../substrate/primitives/runtime'}
 sp-core = {default-features = false, version = '3.0.0', path = '../../../substrate/primitives/core'}
+# Wika libraries
+wika-traits = { default-features = false, version = '3.0.0', path = '../../libs/traits' }
 
 [features]
 default = ['std']
@@ -37,5 +39,6 @@ std = [
 	'sp-application-crypto/std',
 	'sp-io/std',
 	'sp-runtime/std',
-	'sp-core/std'
+	'sp-core/std',
+	'wika-traits/std'
 ]

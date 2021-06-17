@@ -58,7 +58,7 @@ use hex ;
 
 use numtoa::NumToA ;
 
-
+use wika_traits ;
 
 
 

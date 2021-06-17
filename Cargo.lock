@@ -3797,6 +3797,7 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std",
+ "wika-traits",
 ]
 
 [[package]]
@@ -3813,6 +3814,7 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std",
+ "wika-traits",
 ]
 
 [[package]]
@@ -8177,6 +8179,10 @@ dependencies = [
  "sp-version",
  "substrate-wasm-builder",
 ]
+
+[[package]]
+name = "wika-traits"
+version = "3.0.0"
 
 [[package]]
 name = "winapi"

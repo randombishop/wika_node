@@ -358,12 +358,38 @@ where
 
 
 
+// Common parameters
+// -------------------
+
+parameter_types! {
+	pub const MaxLengthURL: u8 = 255;
+}
+
+
+
+
+// Pallet Likes
+// -------------------
+
+parameter_types! {
+	pub const MaxLikes: u8 = 100;
+}
+
+
+impl pallet_likes::Config for Runtime {
+	type Event = Event;
+	type Currency = pallet_balances::Module<Runtime>;
+	type MaxLengthURL = MaxLengthURL;
+	type MaxLikes = MaxLikes;
+}
+
+
+
 
 // Pallet Owners
 // -------------------
 
 parameter_types! {
-	pub const MaxLengthURL: u8 = 255;
 	pub const NumChecksRequired: u8 = 1;
 }
 
@@ -396,7 +422,7 @@ construct_runtime!(
 		Balances: pallet_balances::{Module, Call, Storage, Config<T>, Event<T>},
 		TransactionPayment: pallet_transaction_payment::{Module, Storage},
 		Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
-		// Include the custom logic from the template pallet in the runtime.
+		Likes: pallet_likes::{Module, Call, Storage, Event<T>},
 		Owners: pallet_owners::{Module, Call, Storage, Event<T>},
 	}
 );

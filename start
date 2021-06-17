@@ -1,0 +1,1 @@
+ ./target/debug/wika-node --dev --validator --tmp -lOWNERS=debug

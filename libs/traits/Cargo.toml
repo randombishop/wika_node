@@ -1,0 +1,24 @@
+[package]
+authors = ['Wika Network <https://wika.network>']
+description = 'FRAME pallet to manage likes.'
+edition = '2018'
+homepage = 'https://wika.network'
+license = 'Unlicense'
+name = 'wika-traits'
+repository = 'https://github.com/randombishop/wika_node'
+version = '3.0.0'
+
+[package.metadata.docs.rs]
+targets = ['x86_64-unknown-linux-gnu']
+
+
+[dependencies]
+frame-system = { default-features = false, version = '3.0.0', path = '../../../substrate/frame/system' }
+sp-std = { default-features = false, version = '3.0.0', path = '../../../substrate/primitives/std' }
+
+[features]
+default = ['std']
+std = [
+    'frame-system/std',
+    'sp-std/std'
+]

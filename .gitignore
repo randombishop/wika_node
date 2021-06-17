@@ -14,3 +14,10 @@
 
 # direnv cache
 .direnv
+
+# exclude PyCharm metadata
+.idea
+
+# exlude tmp dir
+/tmp
+

@@ -23,7 +23,6 @@ pub trait Config: frame_system::Config {
     type Event: From<Event<Self>> + Into<<Self as frame_system::Config>::Event>;
 	type Currency: Currency<Self::AccountId> ;
 	type MaxLengthURL: Get<u8> ;
-	type MaxLikes: Get<u8> ;
 	type OwnershipRegistry: OwnershipRegistry<Self> ;
 }
 
@@ -34,14 +33,16 @@ fn u128_to_balance<T:Config>(input: u128) -> BalanceOf<T> {
 	input.saturated_into()
 }
 
-fn num_likes_to_price<T:Config>(num_likes: u8) -> u128 {
+fn num_likes_to_price<T:Config>(num_likes: u32) -> u128 {
 	let num_likes_u128: u128 = num_likes.into() ;
 	LikePrice::get() * num_likes_u128
 }
 
-fn num_likes_to_balance<T:Config>(num_likes: u8) -> BalanceOf<T> {
+fn num_likes_to_balance<T:Config>(num_likes: u32, share: u8) -> BalanceOf<T> {
 	let price_u128: u128 = num_likes_to_price::<T>(num_likes) ;
-	u128_to_balance::<T>(price_u128)
+	let share_u128: u128 = share.into() ;
+	let value = price_u128 * 100 / share_u128 ;
+	return u128_to_balance::<T>(value) ;
 }
 
 const PALLET_ID: ModuleId = ModuleId(*b"LIKE_ME!");
@@ -77,10 +78,38 @@ decl_error! {
 // https://substrate.dev/docs/en/knowledgebase/runtime/storage
 decl_storage! {
     trait Store for Module<T: Config> as Likes {
+
+    	// Number of URLs liked so far
     	UrlCount: u128 = 0 ;
+
+    	// Price to submit 1 Like
     	LikePrice: u128 = 1_000_000_000_000;
+
+    	// Maximum number of likes allowed
+    	MaxLikes: u32 = 100 ;
+
+    	// How likes are split amongst authors, referrers and previous likers
+    	ShareAuthor: u8 = 33 ;
+    	ShareReferrer: u8 = 33 ;
+    	SharePreviousLikers: u8 = 33 ;
+
+    	// Number of times users will keep receiving rewards once they enter the line
+    	NumRoundsToRewardLikers: u8 = 4 ;
+
+    	// URL likes
+    	// - u64: Number of likes received by this URL.
+    	// - AccountId: Current liker waiting in line to receive their rewards
+    	// - AccountId: Last liker in line who will receive rewards
+    	//              (this will be used to update the chain when next one comes in.)
     	Urls: map hasher(blake2_128_concat) Vec<u8> => (u64, T::AccountId, T::AccountId) ;
-        Likes: double_map hasher(blake2_128_concat) T::AccountId, hasher(blake2_128_concat) Vec<u8> => (u64, u8, u8, T::AccountId) ;
+
+    	// Like records by URL / USER
+    	// - u64: Number of previous likes at hte URL when the user submitted his.
+    	// - u32: Number of likes
+    	// - u32: Number of rounds during which payback will be received
+    	// - AccountId: Next liker in line
+        Likes: double_map hasher(blake2_128_concat) T::AccountId, hasher(blake2_128_concat) Vec<u8> => (u64, u32, u32, T::AccountId) ;
+
     }
 }
 
@@ -90,20 +119,60 @@ decl_storage! {
 // Dispatchable functions must be annotated with a weight and must return a DispatchResult.
 impl<T: Config> Module<T> {
 
-	fn pot_id() -> T::AccountId {
+	fn get_pot_id() -> T::AccountId {
         PALLET_ID.into_account()
     }
 
-	pub fn pot() -> BalanceOf<T> {
-		T::Currency::free_balance(&Self::pot_id())
+	fn _get_pot_balance() -> BalanceOf<T> {
+		T::Currency::free_balance(&Self::get_pot_id())
 	}
 
-	fn pay_recipients(sender: &T::AccountId, url: &Vec<u8>, first_recipient: T::AccountId, num_likes: u8)
-		-> (T::AccountId, u8) {
+	fn pay(sender: &T::AccountId, num_likes: u32, recipient: &T::AccountId, share: u8) {
+		let amount = num_likes_to_balance::<T>(num_likes, share) ;
+		debug::debug!(target: "LIKE", "paying {:?} from {:?} to {:?}", &amount, &sender, &recipient);
+		T::Currency::transfer(sender,
+							  recipient,
+							  amount,
+							  ExistenceRequirement::KeepAlive).expect("balance was already checked");
+	}
+
+	fn pay_previous_liker(sender: &T::AccountId, num_likes: u32, recipient: &T::AccountId) {
+		Self::pay(sender, num_likes, recipient, SharePreviousLikers::get()) ;
+	}
+
+	fn pay_author(sender: &T::AccountId, num_likes: u32, recipient: &T::AccountId) {
+		Self::pay(sender, num_likes, recipient, ShareAuthor::get()) ;
+	}
+
+	fn pay_referrer(sender: &T::AccountId, num_likes: u32, recipient: &T::AccountId) {
+		Self::pay(sender, num_likes, recipient, ShareReferrer::get()) ;
+	}
+
+	fn pay_extra(sender: &T::AccountId, num_likes: u32, recipient: &T::AccountId) {
+		let share = 100 - (SharePreviousLikers::get() + ShareAuthor::get() + ShareReferrer::get()) ;
+		Self::pay(sender, num_likes, recipient, share) ;
+	}
+
+	fn pay_author_referrer_and_extra(sender: &T::AccountId, url: &Vec<u8>, url_ref: &Vec<u8>, num_likes: u32) {
+		// Pay author
+		let author = T::OwnershipRegistry::get_owner(url) ;
+		Self::pay_author(&sender, num_likes, &author) ;
+
+		// Pay referrer
+		let referrer = T::OwnershipRegistry::get_owner(url_ref) ;
+		Self::pay_referrer(&sender, num_likes, &referrer) ;
+
+		// Send extra tip to the pot
+		let pot = Self::get_pot_id() ;
+		Self::pay_extra(&sender, num_likes, &pot) ;
+	}
+
+	fn pay_previous_likers(sender: &T::AccountId, url: &Vec<u8>, first_recipient: T::AccountId, num_likes: u32)
+		-> (T::AccountId, u32) {
 		debug::debug!(target: "LIKE", "Paying the target recipients: {:?}", num_likes);
 		let mut recipient = first_recipient ;
-		let mut remaining_likes: u8 = num_likes ;
-		while (remaining_likes>0) && (recipient!=Self::pot_id())  {
+		let mut remaining_likes: u32 = num_likes ;
+		while (remaining_likes>0) && (recipient!=Self::get_pot_id())  {
 			let recipient_data = Likes::<T>::take(&recipient, &url) ;
 			let recipient_likes = recipient_data.2 ;
 			debug::debug!(target: "LIKE", "While loop head...");
@@ -115,11 +184,8 @@ impl<T: Config> Module<T> {
 				debug::debug!(target: "LIKE", "CASE A - FullPayment") ;
 				debug::debug!(target: "LIKE", "Preparing to transfer from: {:?}", &sender);
 				debug::debug!(target: "LIKE", "to: {:?}", recipient);
-				debug::debug!(target: "LIKE", "balance: {:?}", num_likes_to_balance::<T>(recipient_likes));
-				T::Currency::transfer(&sender,
-									  &recipient,
-									  num_likes_to_balance::<T>(recipient_likes),
-									  ExistenceRequirement::KeepAlive).expect("balance was already checked") ;
+				debug::debug!(target: "LIKE", "recipient_likes: {:?}", recipient_likes);
+				Self::pay_previous_liker(&sender, recipient_likes, &recipient) ;
 				remaining_likes -= recipient_likes ;
 				// Done with recipient re-inserting with zero balance
 				let recipient_data_update = (recipient_data.0, recipient_data.1, 0, recipient_data.3.clone()) ;
@@ -132,11 +198,8 @@ impl<T: Config> Module<T> {
 				debug::debug!(target: "LIKE", "CASE B - PartialPayment") ;
 				debug::debug!(target: "LIKE", "Preparing to transfer from: {:?}", &sender);
 				debug::debug!(target: "LIKE", "to: {:?}", &recipient);
-				debug::debug!(target: "LIKE", "balance: {:?}", num_likes_to_balance::<T>(remaining_likes));
-				T::Currency::transfer(&sender,
-									  &recipient,
-									  num_likes_to_balance::<T>(remaining_likes),
-									  ExistenceRequirement::KeepAlive).expect("balance was already checked") ;
+				debug::debug!(target: "LIKE", "remaining_likes: {:?}", remaining_likes);
+				Self::pay_previous_liker(&sender, remaining_likes, &recipient) ;
 				let recipient_likes_update = recipient_likes - remaining_likes ;
 				// Update this recipient state
 				let recipient_data_update = (recipient_data.0, recipient_data.1, recipient_likes_update, recipient_data.3) ;
@@ -149,17 +212,11 @@ impl<T: Config> Module<T> {
 		(recipient, remaining_likes)
 	}
 
-	fn send_to_pot(sender: &T::AccountId, num_likes: u8) {
-		debug::debug!(target: "LIKE", "Sending likes to pot: {:?}", num_likes);
-		T::Currency::transfer(sender,
-							  &Self::pot_id(),
-							  num_likes_to_balance::<T>(num_likes),
-							  ExistenceRequirement::KeepAlive).expect("balance was already checked");
-	}
+
 
 	fn add_to_chain(sender: &T::AccountId, url: &Vec<u8>,
 							 first_in_line: T::AccountId, last_in_line: T::AccountId) {
-		let account = if last_in_line==Self::pot_id() {
+		let account = if last_in_line==Self::get_pot_id() {
 			first_in_line
 		} else {
 			last_in_line
@@ -171,14 +228,14 @@ impl<T: Config> Module<T> {
 		Likes::<T>::insert(&account, &url, update) ;
 	}
 
-	fn update_url(sender: &T::AccountId, url: &Vec<u8>, current_num: u64, num_likes: u8, next_recipient: T::AccountId) {
+	fn update_url(sender: &T::AccountId, url: &Vec<u8>, current_num: u64, num_likes: u32, next_recipient: T::AccountId) {
 		let num_likes_u64: u64 = num_likes.into() ;
 		let num_likes_update: u64 = current_num+num_likes_u64 ;
-		if next_recipient==Self::pot_id() {
+		if next_recipient==Self::get_pot_id() {
 			// If we reached pot_id it means we cleared all recipients from this URL
 			// Sender becomes first in line
 			debug::debug!(target: "LIKE", "Sender is becoming first in line: {:?}", &sender);
-			let new_url_data = (num_likes_update, &sender, &Self::pot_id()) ;
+			let new_url_data = (num_likes_update, &sender, &Self::get_pot_id()) ;
 			Urls::<T>::insert(&url, new_url_data);
 		} else {
 			// Otherwise update first in line and put sender as last
@@ -190,39 +247,57 @@ impl<T: Config> Module<T> {
 		debug::debug!(target: "LIKE", "url state updated: {:?}", &url);
 	}
 
-	fn like_existing_url(sender: &T::AccountId, url: &Vec<u8>, num_likes: u8) {
+	fn like_existing_url(sender: &T::AccountId, url: &Vec<u8>, ref_url: &Vec<u8>, num_likes: u32) {
+
 		// Take URL data
-		debug::debug!(target: "LIKE", "Like existing url: {:?}", &url);
+		debug::debug!(target: "LIKE", "like_existing_url url: {:?}", &url);
 		let data = Urls::<T>::take(&url) ;
 		let current_total_likes = data.0 ;
+
 		// Start by creating the Like record for this sender...
-		debug::debug!(target: "LIKE", "Creating like record: {:?}", &sender);
-		Likes::<T>::insert(&sender, &url, (current_total_likes, num_likes, num_likes*2, Self::pot_id())) ;
-		// Pay the target recipients
-		let (next_recipient, remaining_likes) = Self::pay_recipients(&sender, url, data.1.clone(), num_likes) ;
-		// Send additional likes to the pot
+		debug::debug!(target: "LIKE", "like_existing_url Creating like record: {:?}", &sender);
+		let rounds: u32 = NumRoundsToRewardLikers::get().into() ;
+		Likes::<T>::insert(&sender, &url, (current_total_likes, num_likes, num_likes*rounds, Self::get_pot_id())) ;
+
+		// Pay the previous likers
+		debug::debug!(target: "LIKE", "like_existing_url pay_previous_likers: {:?}", &num_likes);
+		let (next_recipient, remaining_likes) = Self::pay_previous_likers(&sender, url, data.1.clone(), num_likes) ;
+		debug::debug!(target: "LIKE", "like_existing_url next_recipient: {:?}", &next_recipient);
+		debug::debug!(target: "LIKE", "like_existing_url remaining_likes: {:?}", &remaining_likes);
+
+		// Distribute additional likes
 		if remaining_likes>0 {
-			Self::send_to_pot(&sender, remaining_likes) ;
+			let previous_liker = Self::get_pot_id() ;
+			Self::pay_previous_liker(&sender, remaining_likes, &previous_liker) ;
 		}
+
+		// Pay author, referrer and extra
+		Self::pay_author_referrer_and_extra(&sender, url, ref_url, num_likes) ;
+
 		// Add this sender in the queue chain
 		Self::add_to_chain(&sender, &url, data.1, data.2) ;
+
 		// Update the Url state
 		Self::update_url(&sender, &url, data.0, num_likes, next_recipient) ;
 	}
 
-	fn like_new_url(sender: &T::AccountId, url: &Vec<u8>, num_likes: u8) {
+	fn like_new_url(sender: &T::AccountId, url: &Vec<u8>, url_ref: &Vec<u8>, num_likes: u32) {
 		// Create the URL record for the first time
-		// and send the likes to the pot
 		debug::debug!(target: "LIKE", "Creating url state for first time: {:?}", &url);
 		let total_likes:u64 = num_likes.into() ;
-		Urls::<T>::insert(&url, (total_likes, &sender, &Self::pot_id()));
+		Urls::<T>::insert(&url, (total_likes, &sender, Self::get_pot_id()));
 		debug::debug!(target: "LIKE", "Creating first like record: {:?}", &sender);
-		Likes::<T>::insert(&sender, &url, (0, num_likes, num_likes*2, &Self::pot_id()));
+		let rounds: u32 = NumRoundsToRewardLikers::get().into() ;
+		Likes::<T>::insert(&sender, &url, (0, num_likes, num_likes*rounds, Self::get_pot_id()));
 		debug::debug!(target: "LIKE", "Sending likes to pot: {:?}", num_likes);
-		T::Currency::transfer(&sender,
-							  &Self::pot_id(),
-							  num_likes_to_balance::<T>(num_likes),
-							  ExistenceRequirement::KeepAlive).expect("balance was already checked");
+
+		// The share of previous likers goes to the pot
+		let previous_liker = Self::get_pot_id() ;
+		Self::pay_previous_liker(&sender, num_likes, &previous_liker) ;
+
+		// Pay author, referrer and extra
+		Self::pay_author_referrer_and_extra(&sender, url, url_ref, num_likes) ;
+
 		// Update total count of Urls
 		let url_count = UrlCount::take() + 1 ;
 		UrlCount::set(url_count) ;
@@ -242,7 +317,7 @@ decl_module! {
 
         /// Create a new question
         #[weight = 10_000]
-        fn like(origin, url: Vec<u8>, num_likes: u8) {
+        fn like(origin, url: Vec<u8>, url_ref: Vec<u8>, num_likes: u32) {
             // Check that the extrinsic was signed and get the signer.
             let sender = ensure_signed(origin)?;
 
@@ -253,19 +328,18 @@ decl_module! {
 			ensure!(free>total_price_balance, Error::<T>::NotEnoughBalanceToLike) ;
 
 			// Check that num_likes is smaller than MaxLikes
-			ensure!(num_likes<=T::MaxLikes::get(), Error::<T>::TooManyLikes) ;
+			let max_likes: u32 = MaxLikes::get() ;
+			ensure!(num_likes<=max_likes, Error::<T>::TooManyLikes) ;
 
 			// Check that URL is not too long
 			ensure!(url.len()<T::MaxLengthURL::get().into(), Error::<T>::UrlTooLong) ;
 
             // Store the new like.
             if Urls::<T>::contains_key(&url) {
-            	// Check that the sender is not already in line
-				ensure!(!Likes::<T>::contains_key(&sender, &url), Error::<T>::AlreadyInQueue);
-				// Go for all changes
-            	&Self::like_existing_url(&sender, &url, num_likes) ;
+            	ensure!(!Likes::<T>::contains_key(&sender, &url), Error::<T>::AlreadyInQueue);
+            	Self::like_existing_url(&sender, &url, &url_ref, num_likes) ;
             } else {
-            	&Self::like_new_url(&sender, &url, num_likes) ;
+            	Self::like_new_url(&sender, &url, &url_ref, num_likes) ;
             }
 
             // Emit an event that the like was processed.

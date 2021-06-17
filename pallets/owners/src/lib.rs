@@ -523,8 +523,16 @@ decl_error! {
 
 impl<T:Config> OwnershipRegistry<T> for Module<T> {
 
+	fn get_pot_id() -> T::AccountId {
+        PALLET_ID.into_account()
+    }
+
 	fn get_owner(url: &Vec<u8>) -> T::AccountId {
-		Owners::<T>::get(url)
+		if Owners::<T>::contains_key(url) {
+			Owners::<T>::get(url)
+		} else {
+			Self::get_pot_id()
+		}
 	}
 
 }
@@ -534,12 +542,8 @@ impl<T:Config> OwnershipRegistry<T> for Module<T> {
 
 impl<T: Config> Module<T> {
 
-	fn pot_id() -> T::AccountId {
-        PALLET_ID.into_account()
-    }
-
-	pub fn pot() -> BalanceOf<T> {
-		T::Currency::free_balance(&Self::pot_id())
+	fn _get_pot_balance() -> BalanceOf<T> {
+		T::Currency::free_balance(&Self::get_pot_id())
 	}
 
 	fn is_verifier_registered(who: &T::AccountId) -> bool {
@@ -568,7 +572,7 @@ impl<T: Config> Module<T> {
 	fn send_to_pot(sender: &T::AccountId, amount: BalanceOf<T>) {
 		debug::debug!(target: "OWNERS", "Sending likes to pot: {:?}", amount);
 		T::Currency::transfer(sender,
-							  &Self::pot_id(),
+							  &Self::get_pot_id(),
 							  amount,
 							  ExistenceRequirement::KeepAlive).expect("balance was already checked");
 	}

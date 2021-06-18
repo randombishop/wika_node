@@ -353,18 +353,6 @@ impl OffchainCache {
 // Onchain Persistent data
 // -------------------------------------------------
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Debug)]
-struct VerifierStats {
-	commits: u32 ,
-	commits_time: u32 ,
-	reveals: u32 ,
-	reveals_time: u32 ,
-	votes_valid: u32 ,
-	votes_yes: u32 ,
-	votes_correct: u32
-}
-
-
 decl_storage! {
 	trait Store for Module<T: Config> as Owners {
 		// Total number of URLs registered
@@ -394,10 +382,16 @@ decl_storage! {
 		MajorityMin: u32 = 1 ;
 
     	// Registered verifiers
-    	// 1. Block at which they were registered
-    	// 2. Enabled true/false
-    	// 3. Stats
-    	Verifiers: map hasher(identity) T::AccountId => (T::BlockNumber, bool, VerifierStats) ;
+    	// 0. Block at which they were registered
+    	// 1. Enabled true/false
+    	// 2. commits
+		// 3. commits_time
+		// 4. reveals
+		// 5. reveals_time
+		// 6. votes_valid
+		// 7. votes_yes
+		// 8. votes_correct
+    	Verifiers: map hasher(identity) T::AccountId => (T::BlockNumber, bool, u32, u32, u32, u32, u32, u32, u32) ;
 
     	// List of requests received by block
     	History: map hasher(identity) T::BlockNumber => Vec<Vec<u8>> ;
@@ -846,13 +840,13 @@ impl<T: Config> Module<T> {
 		if prct>bar {
 			debug::debug!(target: "OWNERS", "aggregate_votes_for_request votes are valid");
 			for (account, (r_vote, r_intro, r_proof)) in &reveals {
-				let mut stats = Verifiers::<T>::get(account).2 ;
-				stats.votes_valid += 1 ;
+				let mut stats = Verifiers::<T>::get(account) ;
+				stats.6 += 1 ;
 				if *r_vote {
-					stats.votes_yes += 1 ;
+					stats.7 += 1 ;
 				}
 				if (r_vote, r_intro, r_proof) == (vote, intro, proof) {
-					stats.votes_correct += 1 ;
+					stats.8 += 1 ;
 				}
 			}
 		}
@@ -938,8 +932,7 @@ decl_module! {
 
 			// Add account as a new verifier
 			let current_block = <frame_system::Module<T>>::block_number();
-			let stats:VerifierStats = VerifierStats::default() ;
-			let verifier = (current_block, true, stats) ;
+			let verifier = (current_block, true, 0, 0, 0, 0, 0, 0, 0) ;
 			Verifiers::<T>::insert(&account, verifier);
 
             // Emit an event that new validator was added.
@@ -1048,9 +1041,9 @@ decl_module! {
 
 			// Update verifier stats
 			let mut stats = Verifiers::<T>::take(&sender);
-			stats.2.commits += 1 ;
+			stats.2 += 1 ;
 			let n_blocks:u32 = block_to_u32::<T>(current_block-request_block)  ;
-			stats.2.commits_time += n_blocks ;
+			stats.3 += n_blocks ;
 			Verifiers::<T>::insert(&sender, &stats);
 			debug::debug!(target: "OWNERS", "commit_verification updated stats: {:?}", &stats);
 
@@ -1146,9 +1139,9 @@ decl_module! {
 
 			// Update verifier stats
 			let mut stats = Verifiers::<T>::take(&sender);
-			stats.2.reveals += 1 ;
+			stats.4 += 1 ;
 			let n_blocks:u32 = block_to_u32::<T>(current_block-min_block) ;
-			stats.2.reveals_time += n_blocks ;
+			stats.5 += n_blocks ;
 			Verifiers::<T>::insert(&sender, &stats);
 			debug::debug!(target: "OWNERS", "reveal_verification updated stats: {:?}", &stats);
 

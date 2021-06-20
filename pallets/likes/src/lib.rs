@@ -41,7 +41,7 @@ fn num_likes_to_price<T:Config>(num_likes: u32) -> u128 {
 fn num_likes_to_balance<T:Config>(num_likes: u32, share: u8) -> BalanceOf<T> {
 	let price_u128: u128 = num_likes_to_price::<T>(num_likes) ;
 	let share_u128: u128 = share.into() ;
-	let value = price_u128 * 100 / share_u128 ;
+	let value = price_u128 * share_u128 / 100 ;
 	return u128_to_balance::<T>(value) ;
 }
 

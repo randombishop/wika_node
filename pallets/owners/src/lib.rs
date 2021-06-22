@@ -420,7 +420,7 @@ decl_storage! {
     	// - Num votes majority
     	// - First characters of the webpage
     	// - Mark found on the page
-    	Results: map hasher(blake2_128_concat) Vec<u8> => (u32, u32, u32, Vec<u8>, Vec<u8>) ;
+    	Results: map hasher(blake2_128_concat) Vec<u8> => (T::BlockNumber, u32, u32, u32, Vec<u8>, Vec<u8>, bool) ;
 
     	// Final URL-Account map representing ownership
     	Owners: map hasher(blake2_128_concat) Vec<u8> => T::AccountId ;
@@ -831,12 +831,22 @@ impl<T: Config> Module<T> {
 		debug::debug!(target: "OWNERS", "aggregate_votes_for_request majority count_yes: {:?}", count_yes);
 
 		// Save the results
-		let result: (u32, u32, u32, &Vec<u8>, &Vec<u8>) = (total, count_yes, count_majority, intro, proof) ;
-		Results::insert(&url, result) ;
+		let bar: u32 = PrctNeededForAgreement::get().into() ;
+		let majority_min: u32 = MajorityMin::get().into() ;
+		let outcome = *vote && prct>bar && count_majority>=majority_min ;
+		let result: (T::BlockNumber, u32, u32, u32, &Vec<u8>, &Vec<u8>, bool) = (
+			Self::current_block_number(),
+			total,
+			count_yes,
+			count_majority,
+			intro,
+			proof,
+			outcome
+		) ;
+		Results::<T>::insert(&url, result) ;
 
 		// Update verifiers' stats if prct majority passed the bar
 		// If not, these votes won't count in the verifier stats
-		let bar: u32 = PrctNeededForAgreement::get().into() ;
 		if prct>bar {
 			debug::debug!(target: "OWNERS", "aggregate_votes_for_request votes are valid");
 			for (account, (r_vote, r_intro, r_proof)) in &reveals {
@@ -856,9 +866,7 @@ impl<T: Config> Module<T> {
 		// - Majority voted YES
 		// - Majority represents at least PrctNeededForAgreement
 		// - Majority is at least MajorityMin
-		let majority_min: u32 = MajorityMin::get().into() ;
-		let ok = *vote && prct>bar && count_majority>majority_min ;
-		if ok {
+		if outcome {
 			debug::debug!(target: "OWNERS", "aggregate_votes_for_request ownership approved") ;
 			let (_, owner) = Requests::<T>::get(&url) ;
 			Owners::<T>::insert(&url, owner) ;
@@ -881,7 +889,7 @@ impl<T: Config> Module<T> {
 				Requests::<T>::remove(&url) ;
 				Commits::<T>::remove_prefix(&url) ;
 				Reveals::<T>::remove_prefix(&url) ;
-				Results::remove(&url) ;
+				Results::<T>::remove(&url) ;
 			}
 		}
 		debug::debug!(target: "OWNERS", "clean_up DONE");

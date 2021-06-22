@@ -104,7 +104,7 @@ decl_storage! {
     	Urls: map hasher(blake2_128_concat) Vec<u8> => (u64, T::AccountId, T::AccountId) ;
 
     	// Like records by URL / USER
-    	// - u64: Number of previous likes at hte URL when the user submitted his.
+    	// - u64: Number of previous likes at the URL when the user submitted his.
     	// - u32: Number of likes
     	// - u32: Number of rounds during which payback will be received
     	// - AccountId: Next liker in line

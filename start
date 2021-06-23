@@ -1,1 +1,1 @@
- ./target/debug/wika-node --dev --validator --tmp -lOWNERS=debug -lLIKE=debug
+ ./target/debug/wika-node --tmp --dev --validator -lOWNERS=debug -lLIKE=debug

@@ -23,9 +23,21 @@ use frame_system::{
 
 use wika_traits::AuthorityRegistry ;
 
+use sp_runtime::SaturatedConversion ;
+
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 
 use pallet_grandpa::AuthorityId as GrandpaId;
+
+use parity_scale_codec::Decode ;
+
+
+
+
+
+
+
+
 
 
 // Pallet config
@@ -139,6 +151,12 @@ impl<T: Config> Module<T> {
 	fn initialize_keys(keys: &Vec<([u8;32],[u8;32])>) {
 		let count: u16 = keys.len().try_into().expect("small number") ;
 		AuthCount::set(count) ;
+		for (sr25519,ed25519) in keys {
+			let account: T::AccountId = T::AccountId::decode(&mut &sr25519[..]).expect("valid key") ;
+			let zero: u8 = 0 ;
+			let block: T::BlockNumber = zero.saturated_into() ;
+			Authorities::<T>::insert(&account, (block, true, sr25519, ed25519));
+		}
 	}
 
 	fn is_registered(who: &T::AccountId) -> bool {

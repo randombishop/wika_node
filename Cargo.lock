@@ -3748,9 +3748,11 @@ dependencies = [
  "frame-system",
  "hex",
  "numtoa",
+ "pallet-grandpa",
  "parity-scale-codec",
  "serde",
  "sp-application-crypto",
+ "sp-consensus-aura",
  "sp-core",
  "sp-io",
  "sp-runtime",
@@ -8205,6 +8207,8 @@ name = "wika-traits"
 version = "3.0.0"
 dependencies = [
  "frame-system",
+ "pallet-grandpa",
+ "sp-consensus-aura",
  "sp-std",
 ]
 

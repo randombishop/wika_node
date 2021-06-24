@@ -89,15 +89,44 @@ const BALANCE_UNIT: u128 = 1000000000000 ;
 
 const INITIAL_AUTHORITIES_BALANCE: u128 = 1000 * BALANCE_UNIT;
 
-fn initial_test_nodes() -> Vec<([u8; 32],[u8; 32])> {
+
+fn initial_nodes_dev() -> Vec<([u8; 32],[u8; 32])> {
 	vec![
-		// node1
+		// Alice
+		(
+			hex!("d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"),
+			hex!("88dc3417d5058ec4b4503e0c12ea1a0a89be200fe98922423d4334014fa6b0ee")
+		),
+
+		// Bob
+		(
+			hex!("8eaf04151687736326c9fea17e25fc5287613693c912909cb226aa4794f26a48"),
+			hex!("d17c2d7823ebf260fd138f2d7e27d114c0145d968b5ff5006125f2414fadae69")
+		),
+
+		// Charlie
+		(
+			hex!("90b5ab205c6974c9ea841be688864633dc9ca8a357843eeacf2314649965fe22"),
+			hex!("439660b36c6c03afafca027b910b4fecf99801834c62a5e6006f27d978de234f")
+		),
+
+		// Dave
+		(
+			hex!("306721211d5404bd9da88e0204360a1a9ab8b87c66c1bc2fcdd37f3c2222cc20"),
+			hex!("5e639b43e0052c47447dac87d6fd2b6ec50bdd4d0f614e4299c665249bbd09d9")
+		),
+	]
+}
+
+fn initial_nodes_test() -> Vec<([u8; 32],[u8; 32])> {
+	vec![
+		// testnode1
 		(
 			hex!("3277d22306435a4800ebc611216d301cb79d2166b7519a6bdf58b0b6fb523267"),
 			hex!("2bdb6dab53650339faa80a06fde1b27ea46cee14ee0523bfc43d6c37d64f933d")
 		) ,
 
-		// node2
+		// testnode2
 		(
 			hex!("d021327f24e3ee188449b9264cb401f94caea467656a505fae1fdb0f6eda523b"),
 			hex!("ced4ef1df5f05aabc0ae1f7d5ee499edf765291aa4f5efc0f0b074e059e0ef52")
@@ -105,15 +134,15 @@ fn initial_test_nodes() -> Vec<([u8; 32],[u8; 32])> {
 	]
 }
 
-fn initial_main_nodes() -> Vec<([u8; 32],[u8; 32])> {
+fn initial_nodes_main() -> Vec<([u8; 32],[u8; 32])> {
 	vec![
-		// node1
+		// mainnode1
 		(
 			hex!("3277d22306435a4800ebc611216d301cb79d2166b7519a6bdf58b0b6fb523267"),
 			hex!("2bdb6dab53650339faa80a06fde1b27ea46cee14ee0523bfc43d6c37d64f933d")
 		) ,
 
-		// node2
+		// mainnode2
 		(
 			hex!("d021327f24e3ee188449b9264cb401f94caea467656a505fae1fdb0f6eda523b"),
 			hex!("ced4ef1df5f05aabc0ae1f7d5ee499edf765291aa4f5efc0f0b074e059e0ef52")
@@ -163,7 +192,7 @@ pub fn dev_config() -> Result<ChainSpec, String> {
 
 pub fn test_config() -> Result<ChainSpec, String> {
 	let wasm_binary = WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?;
-	let test_nodes = initial_test_nodes() ;
+	let test_nodes = initial_nodes_test() ;
 
 	Ok(ChainSpec::from_genesis(
 		// Name
@@ -193,7 +222,7 @@ pub fn test_config() -> Result<ChainSpec, String> {
 
 pub fn main_config() -> Result<ChainSpec, String> {
 	let wasm_binary = WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?;
-	let main_nodes = initial_main_nodes() ;
+	let main_nodes = initial_nodes_main() ;
 
 	Ok(ChainSpec::from_genesis(
 		"Wika MainNet",
@@ -247,7 +276,7 @@ fn wika_genesis(
 			key: root_key,
 		}),
 		pallet_authorities: Some(AuthoritiesConfig {
-			keys: vec![],
+			keys: initial_nodes_dev(),
 		}),
 	}
 }

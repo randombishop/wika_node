@@ -38,9 +38,7 @@ use sp_runtime::{
 	},
 	offchain as rt_offchain,
 	offchain::{
-		storage::StorageValueRef,
-		//storage_lock::{Time, StorageLock},
-		//Duration
+		storage::StorageValueRef
 	},
 };
 

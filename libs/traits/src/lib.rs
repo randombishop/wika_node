@@ -2,6 +2,8 @@
 
 use frame_system::Config ;
 use sp_std::vec::Vec;
+use sp_consensus_aura::sr25519::AuthorityId as AuraId;
+use pallet_grandpa::AuthorityId as GrandpaId;
 
 pub trait OwnershipRegistry<T:Config> {
 
@@ -14,6 +16,8 @@ pub trait OwnershipRegistry<T:Config> {
 
 pub trait AuthorityRegistry<T:Config> {
 
-    fn list_grandpa() ;
+    fn list_aura() -> Vec<AuraId> ;
+
+    fn list_grandpa() -> Vec<GrandpaId> ;
 
 }

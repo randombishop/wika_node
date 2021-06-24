@@ -10,3 +10,10 @@ pub trait OwnershipRegistry<T:Config> {
     fn get_owner(url: &Vec<u8>) -> T::AccountId ;
 
 }
+
+
+pub trait AuthorityRegistry<T:Config> {
+
+    fn list_grandpa() ;
+
+}

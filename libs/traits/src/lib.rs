@@ -18,6 +18,6 @@ pub trait AuthorityRegistry<T:Config> {
 
     fn list_aura() -> Vec<AuraId> ;
 
-    fn list_grandpa() -> Vec<GrandpaId> ;
+    fn list_grandpa() -> Vec<(GrandpaId, u64)> ;
 
 }

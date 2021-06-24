@@ -133,11 +133,11 @@ impl<T:Config> AuthorityRegistry<T> for Module<T> {
 		ans
 	}
 
-    fn list_grandpa() -> Vec<GrandpaId> {
+    fn list_grandpa() -> Vec<(GrandpaId, u64)> {
 		let mut ans = vec![] ;
 		for (_,(_,_,_,addr)) in Authorities::<T>::iter() {
 			let public = sp_core::ed25519::Public::from_raw(addr) ;
-			ans.push(public.into()) ;
+			ans.push((public.into(), 1)) ;
 		}
 		ans
 	}

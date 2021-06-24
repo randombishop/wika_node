@@ -55,7 +55,8 @@ use pallet_transaction_payment::CurrencyAdapter;
 use codec::{Encode} ;
 use frame_system::offchain::AppCrypto ;
 
-// Import the wika pallets
+// Import the wika libs and pallets
+use wika_traits::AuthorityRegistry;
 pub use pallet_authorities;
 pub use pallet_owners;
 pub use pallet_likes;
@@ -536,7 +537,8 @@ impl_runtime_apis! {
 		}
 
 		fn authorities() -> Vec<AuraId> {
-			Aura::authorities()
+			//Aura::authorities()
+			Authorities::list_aura()
 		}
 	}
 
@@ -554,7 +556,8 @@ impl_runtime_apis! {
 
 	impl fg_primitives::GrandpaApi<Block> for Runtime {
 		fn grandpa_authorities() -> GrandpaAuthorityList {
-			Grandpa::grandpa_authorities()
+			//Grandpa::grandpa_authorities()
+			Authorities::list_grandpa()
 		}
 
 		fn submit_report_equivocation_unsigned_extrinsic(

@@ -8196,6 +8196,7 @@ dependencies = [
  "sp-transaction-pool",
  "sp-version",
  "substrate-wasm-builder",
+ "wika-traits",
 ]
 
 [[package]]

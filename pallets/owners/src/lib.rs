@@ -353,18 +353,6 @@ impl OffchainCache {
 // Onchain Persistent data
 // -------------------------------------------------
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Debug)]
-struct VerifierStats {
-	commits: u32 ,
-	commits_time: u32 ,
-	reveals: u32 ,
-	reveals_time: u32 ,
-	votes_valid: u32 ,
-	votes_yes: u32 ,
-	votes_correct: u32
-}
-
-
 decl_storage! {
 	trait Store for Module<T: Config> as Owners {
 		// Total number of URLs registered
@@ -394,10 +382,16 @@ decl_storage! {
 		MajorityMin: u32 = 1 ;
 
     	// Registered verifiers
-    	// 1. Block at which they were registered
-    	// 2. Enabled true/false
-    	// 3. Stats
-    	Verifiers: map hasher(identity) T::AccountId => (T::BlockNumber, bool, VerifierStats) ;
+    	// 0. Block at which they were registered
+    	// 1. Enabled true/false
+    	// 2. commits
+		// 3. commits_time
+		// 4. reveals
+		// 5. reveals_time
+		// 6. votes_valid
+		// 7. votes_yes
+		// 8. votes_correct
+    	Verifiers: map hasher(identity) T::AccountId => (T::BlockNumber, bool, u32, u32, u32, u32, u32, u32, u32) ;
 
     	// List of requests received by block
     	History: map hasher(identity) T::BlockNumber => Vec<Vec<u8>> ;
@@ -426,7 +420,7 @@ decl_storage! {
     	// - Num votes majority
     	// - First characters of the webpage
     	// - Mark found on the page
-    	Results: map hasher(blake2_128_concat) Vec<u8> => (u32, u32, u32, Vec<u8>, Vec<u8>) ;
+    	Results: map hasher(blake2_128_concat) Vec<u8> => (T::BlockNumber, u32, u32, u32, Vec<u8>, Vec<u8>, bool) ;
 
     	// Final URL-Account map representing ownership
     	Owners: map hasher(blake2_128_concat) Vec<u8> => T::AccountId ;
@@ -523,8 +517,16 @@ decl_error! {
 
 impl<T:Config> OwnershipRegistry<T> for Module<T> {
 
+	fn get_pot_id() -> T::AccountId {
+        PALLET_ID.into_account()
+    }
+
 	fn get_owner(url: &Vec<u8>) -> T::AccountId {
-		Owners::<T>::get(url)
+		if Owners::<T>::contains_key(url) {
+			Owners::<T>::get(url)
+		} else {
+			Self::get_pot_id()
+		}
 	}
 
 }
@@ -534,12 +536,8 @@ impl<T:Config> OwnershipRegistry<T> for Module<T> {
 
 impl<T: Config> Module<T> {
 
-	fn pot_id() -> T::AccountId {
-        PALLET_ID.into_account()
-    }
-
-	pub fn pot() -> BalanceOf<T> {
-		T::Currency::free_balance(&Self::pot_id())
+	fn _get_pot_balance() -> BalanceOf<T> {
+		T::Currency::free_balance(&Self::get_pot_id())
 	}
 
 	fn is_verifier_registered(who: &T::AccountId) -> bool {
@@ -568,7 +566,7 @@ impl<T: Config> Module<T> {
 	fn send_to_pot(sender: &T::AccountId, amount: BalanceOf<T>) {
 		debug::debug!(target: "OWNERS", "Sending likes to pot: {:?}", amount);
 		T::Currency::transfer(sender,
-							  &Self::pot_id(),
+							  &Self::get_pot_id(),
 							  amount,
 							  ExistenceRequirement::KeepAlive).expect("balance was already checked");
 	}
@@ -833,22 +831,32 @@ impl<T: Config> Module<T> {
 		debug::debug!(target: "OWNERS", "aggregate_votes_for_request majority count_yes: {:?}", count_yes);
 
 		// Save the results
-		let result: (u32, u32, u32, &Vec<u8>, &Vec<u8>) = (total, count_yes, count_majority, intro, proof) ;
-		Results::insert(&url, result) ;
+		let bar: u32 = PrctNeededForAgreement::get().into() ;
+		let majority_min: u32 = MajorityMin::get().into() ;
+		let outcome = *vote && prct>bar && count_majority>=majority_min ;
+		let result: (T::BlockNumber, u32, u32, u32, &Vec<u8>, &Vec<u8>, bool) = (
+			Self::current_block_number(),
+			total,
+			count_yes,
+			count_majority,
+			intro,
+			proof,
+			outcome
+		) ;
+		Results::<T>::insert(&url, result) ;
 
 		// Update verifiers' stats if prct majority passed the bar
 		// If not, these votes won't count in the verifier stats
-		let bar: u32 = PrctNeededForAgreement::get().into() ;
 		if prct>bar {
 			debug::debug!(target: "OWNERS", "aggregate_votes_for_request votes are valid");
 			for (account, (r_vote, r_intro, r_proof)) in &reveals {
-				let mut stats = Verifiers::<T>::get(account).2 ;
-				stats.votes_valid += 1 ;
+				let mut stats = Verifiers::<T>::get(account) ;
+				stats.6 += 1 ;
 				if *r_vote {
-					stats.votes_yes += 1 ;
+					stats.7 += 1 ;
 				}
 				if (r_vote, r_intro, r_proof) == (vote, intro, proof) {
-					stats.votes_correct += 1 ;
+					stats.8 += 1 ;
 				}
 			}
 		}
@@ -858,9 +866,7 @@ impl<T: Config> Module<T> {
 		// - Majority voted YES
 		// - Majority represents at least PrctNeededForAgreement
 		// - Majority is at least MajorityMin
-		let majority_min: u32 = MajorityMin::get().into() ;
-		let ok = *vote && prct>bar && count_majority>majority_min ;
-		if ok {
+		if outcome {
 			debug::debug!(target: "OWNERS", "aggregate_votes_for_request ownership approved") ;
 			let (_, owner) = Requests::<T>::get(&url) ;
 			Owners::<T>::insert(&url, owner) ;
@@ -883,7 +889,7 @@ impl<T: Config> Module<T> {
 				Requests::<T>::remove(&url) ;
 				Commits::<T>::remove_prefix(&url) ;
 				Reveals::<T>::remove_prefix(&url) ;
-				Results::remove(&url) ;
+				Results::<T>::remove(&url) ;
 			}
 		}
 		debug::debug!(target: "OWNERS", "clean_up DONE");
@@ -934,8 +940,7 @@ decl_module! {
 
 			// Add account as a new verifier
 			let current_block = <frame_system::Module<T>>::block_number();
-			let stats:VerifierStats = VerifierStats::default() ;
-			let verifier = (current_block, true, stats) ;
+			let verifier = (current_block, true, 0, 0, 0, 0, 0, 0, 0) ;
 			Verifiers::<T>::insert(&account, verifier);
 
             // Emit an event that new validator was added.
@@ -1044,9 +1049,9 @@ decl_module! {
 
 			// Update verifier stats
 			let mut stats = Verifiers::<T>::take(&sender);
-			stats.2.commits += 1 ;
+			stats.2 += 1 ;
 			let n_blocks:u32 = block_to_u32::<T>(current_block-request_block)  ;
-			stats.2.commits_time += n_blocks ;
+			stats.3 += n_blocks ;
 			Verifiers::<T>::insert(&sender, &stats);
 			debug::debug!(target: "OWNERS", "commit_verification updated stats: {:?}", &stats);
 
@@ -1142,9 +1147,9 @@ decl_module! {
 
 			// Update verifier stats
 			let mut stats = Verifiers::<T>::take(&sender);
-			stats.2.reveals += 1 ;
+			stats.4 += 1 ;
 			let n_blocks:u32 = block_to_u32::<T>(current_block-min_block) ;
-			stats.2.reveals_time += n_blocks ;
+			stats.5 += n_blocks ;
 			Verifiers::<T>::insert(&sender, &stats);
 			debug::debug!(target: "OWNERS", "reveal_verification updated stats: {:?}", &stats);
 

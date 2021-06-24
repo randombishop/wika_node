@@ -3741,6 +3741,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-authorities"
+version = "3.0.0"
+dependencies = [
+ "frame-support",
+ "frame-system",
+ "hex",
+ "numtoa",
+ "parity-scale-codec",
+ "sp-application-crypto",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+ "wika-traits",
+]
+
+[[package]]
 name = "pallet-authorship"
 version = "3.0.0"
 dependencies = [
@@ -8111,6 +8128,7 @@ version = "2.0.0"
 dependencies = [
  "frame-benchmarking",
  "frame-benchmarking-cli",
+ "hex-literal",
  "jsonrpc-core",
  "pallet-transaction-payment-rpc",
  "sc-basic-authorship",
@@ -8155,6 +8173,7 @@ dependencies = [
  "frame-system-rpc-runtime-api",
  "hex-literal",
  "pallet-aura",
+ "pallet-authorities",
  "pallet-balances",
  "pallet-grandpa",
  "pallet-likes",

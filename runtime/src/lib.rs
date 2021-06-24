@@ -389,16 +389,10 @@ impl pallet_owners::Config for Runtime {
 // Pallet Likes
 // -------------------
 
-parameter_types! {
-	pub const MaxLikes: u8 = 100;
-}
-
-
 impl pallet_likes::Config for Runtime {
 	type Event = Event;
 	type Currency = pallet_balances::Module<Runtime>;
 	type MaxLengthURL = MaxLengthURL;
-	type MaxLikes = MaxLikes;
 	type OwnershipRegistry = pallet_owners::Module<Runtime> ;
 }
 

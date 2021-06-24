@@ -1,0 +1,2 @@
+- Manage list of authorities and validators with sudo
+- Dockerfile

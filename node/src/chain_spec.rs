@@ -1,7 +1,7 @@
 use sp_core::{Pair, Public, sr25519};
 use wika_runtime::{
 	AccountId, AuraConfig, BalancesConfig, GenesisConfig, GrandpaConfig,
-	SudoConfig, SystemConfig, WASM_BINARY, Signature
+	SudoConfig, SystemConfig, AuthoritiesConfig, WASM_BINARY, Signature
 };
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_finality_grandpa::AuthorityId as GrandpaId;
@@ -245,6 +245,9 @@ fn wika_genesis(
 		}),
 		pallet_sudo: Some(SudoConfig {
 			key: root_key,
+		}),
+		pallet_authorities: Some(AuthoritiesConfig {
+			keys: vec![],
 		}),
 	}
 }

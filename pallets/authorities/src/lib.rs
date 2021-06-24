@@ -5,6 +5,10 @@
 // Imports
 // -------------------------------------------------
 
+use sp_std::prelude::*;
+
+use sp_std::vec::Vec;
+
 use frame_support::{
 	ensure,
 	decl_error, decl_event, decl_module, decl_storage
@@ -15,6 +19,7 @@ use frame_system::{
 };
 
 use wika_traits::AuthorityRegistry ;
+
 
 
 
@@ -42,6 +47,10 @@ decl_storage! {
     	// 1. Enabled true/false
     	Authorities: map hasher(identity) T::AccountId => (T::BlockNumber, bool) ;
 	}
+	add_extra_genesis {
+        config(keys): Vec<([u8;32],[u8;32])>;
+        build(|config| Module::<T>::initialize_keys(&config.keys))
+    }
 }
 
 
@@ -107,6 +116,10 @@ impl<T:Config> AuthorityRegistry<T> for Module<T> {
 
 impl<T: Config> Module<T> {
 
+	fn initialize_keys(keys: &Vec<([u8;32],[u8;32])>) {
+
+	}
+
 	fn is_registered(who: &T::AccountId) -> bool {
 		Authorities::<T>::contains_key(who)
 	}
@@ -141,6 +154,10 @@ decl_module! {
 			let authority = (current_block, true) ;
 			Authorities::<T>::insert(&account, authority);
 
+			// Update total count of authoritiess
+			let count = AuthCount::take() + 1 ;
+			AuthCount::set(count) ;
+
             // Emit an event that new validator was added.
             Self::deposit_event(RawEvent::AuthorityAdded(account));
         }
@@ -165,7 +182,7 @@ decl_module! {
 
         // Enable an authority
         #[weight = 10_000]
-        fn enable_verifier(origin, account: T::AccountId) {
+        fn enable_authority(origin, account: T::AccountId) {
             // Check that the extrinsic is from sudo.
             ensure_root(origin)?;
 

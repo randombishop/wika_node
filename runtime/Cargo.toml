@@ -57,17 +57,8 @@ substrate-wasm-builder = { version = "4.0.0", path = "../../substrate/utils/wasm
 default = ["std"]
 std = [
 	"codec/std",
-	"frame-executive/std",
-	"frame-support/std",
-	"pallet-aura/std",
-	"pallet-balances/std",
-	"pallet-grandpa/std",
-	"pallet-randomness-collective-flip/std",
-	"pallet-sudo/std",
-	"pallet-timestamp/std",
-	"pallet-transaction-payment/std",
-	"pallet-transaction-payment-rpc-runtime-api/std",
 	"serde",
+
 	"sp-api/std",
 	"sp-block-builder/std",
 	"sp-consensus-aura/std",
@@ -79,10 +70,25 @@ std = [
 	"sp-std/std",
 	"sp-transaction-pool/std",
 	"sp-version/std",
+
+	"frame-executive/std",
+	"frame-support/std",
+	"pallet-aura/std",
+	"pallet-balances/std",
+	"pallet-grandpa/std",
+	"pallet-randomness-collective-flip/std",
+	"pallet-sudo/std",
+	"pallet-timestamp/std",
+	"pallet-transaction-payment/std",
+	"pallet-transaction-payment-rpc-runtime-api/std",
 	"frame-system/std",
 	"frame-system-rpc-runtime-api/std",
+
+	"pallet-authorities/std",
 	"pallet-owners/std",
+	"pallet-likes/std",
 ]
+
 runtime-benchmarks = [
 	"sp-runtime/runtime-benchmarks",
 	"frame-benchmarking",

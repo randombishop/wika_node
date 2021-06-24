@@ -3749,6 +3749,7 @@ dependencies = [
  "hex",
  "numtoa",
  "parity-scale-codec",
+ "serde",
  "sp-application-crypto",
  "sp-core",
  "sp-io",

@@ -3,8 +3,6 @@ use wika_runtime::{
 	AccountId, BalancesConfig, GenesisConfig,
 	SudoConfig, SystemConfig, AuraConfig, GrandpaConfig, AuthoritiesConfig, WASM_BINARY, Signature
 };
-//use sp_consensus_aura::sr25519::AuthorityId as AuraId;
-//use sp_finality_grandpa::AuthorityId as GrandpaId;
 use sp_runtime::traits::{Verify, IdentifyAccount};
 use sc_service::ChainType;
 use hex_literal::hex;
@@ -32,12 +30,6 @@ pub fn get_account_id_from_seed<TPublic: Public>(seed: &str) -> AccountId where
 	AccountPublic::from(get_from_seed::<TPublic>(seed)).into_account()
 }
 
-/*pub fn authority_keys_from_seed(s: &str) -> (AuraId, GrandpaId) {
-	(
-		get_from_seed::<AuraId>(s),
-		get_from_seed::<GrandpaId>(s),
-	)
-}*/
 
 
 // Get Public and AccountID from addresses.
@@ -52,13 +44,7 @@ pub fn get_account_id_from_address<TPublic: Public>(address: &[u8; 32]) -> Accou
 	AccountPublic::from(get_from_address::<TPublic>(address)).into_account()
 }
 
-/*pub fn authority_keys_from_address(addr_sr25519: &[u8; 32], addr_ed25519: &[u8; 32]) -> (AuraId, GrandpaId) {
 
-	(
-		get_from_address::<AuraId>(addr_sr25519),
-		get_from_address::<GrandpaId>(addr_ed25519),
-	)
-}*/
 
 
 

@@ -59,13 +59,7 @@ fn list_to_accounts(list: &Vec<([u8; 32],[u8; 32])>) -> Vec<AccountId> {
 	ans
 }
 
-/*fn list_to_authorities(list: &Vec<([u8; 32],[u8; 32])>) -> Vec<(AuraId, GrandpaId)> {
-	let mut ans: Vec<(AuraId, GrandpaId)> = vec![] ;
-	for (addr_sr25519,addr_ed25519) in list {
-		ans.push(authority_keys_from_address(&addr_sr25519, &addr_ed25519)) ;
-	}
-	ans
-}*/
+
 
 
 
@@ -82,25 +76,7 @@ fn initial_nodes_dev() -> Vec<([u8; 32],[u8; 32])> {
 		(
 			hex!("d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"),
 			hex!("88dc3417d5058ec4b4503e0c12ea1a0a89be200fe98922423d4334014fa6b0ee")
-		),
-
-		/* Bob
-		(
-			hex!("8eaf04151687736326c9fea17e25fc5287613693c912909cb226aa4794f26a48"),
-			hex!("d17c2d7823ebf260fd138f2d7e27d114c0145d968b5ff5006125f2414fadae69")
-		),
-
-		 Charlie
-		(
-			hex!("90b5ab205c6974c9ea841be688864633dc9ca8a357843eeacf2314649965fe22"),
-			hex!("439660b36c6c03afafca027b910b4fecf99801834c62a5e6006f27d978de234f")
-		),
-
-		 Dave
-		(
-			hex!("306721211d5404bd9da88e0204360a1a9ab8b87c66c1bc2fcdd37f3c2222cc20"),
-			hex!("5e639b43e0052c47447dac87d6fd2b6ec50bdd4d0f614e4299c665249bbd09d9")
-		),*/
+		)
 	]
 }
 

@@ -1,2 +1,1 @@
-- Manage list of authorities and validators with sudo
-- Dockerfile
+- Dockerfile, clean up Google cloud, and deploy test and main nets.

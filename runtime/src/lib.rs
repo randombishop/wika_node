@@ -55,9 +55,13 @@ use pallet_transaction_payment::CurrencyAdapter;
 use codec::{Encode} ;
 use frame_system::offchain::AppCrypto ;
 
-// Import the template pallet.
-pub use pallet_likes;
+// Import the wika libs and pallets
+use wika_traits::AuthorityRegistry;
+pub use pallet_authorities;
 pub use pallet_owners;
+pub use pallet_likes;
+
+
 
 
 
@@ -367,6 +371,17 @@ parameter_types! {
 
 
 
+
+// Pallet Authorities
+// -------------------
+
+impl pallet_authorities::Config for Runtime {
+	type Event = Event;
+}
+
+
+
+
 // Pallet Owners
 // -------------------
 
@@ -383,6 +398,7 @@ impl pallet_owners::Config for Runtime {
 	type MaxLengthURL = MaxLengthURL;
 	type NumChecksRequired = NumChecksRequired ;
 }
+
 
 
 
@@ -414,6 +430,8 @@ construct_runtime!(
 		Balances: pallet_balances::{Module, Call, Storage, Config<T>, Event<T>},
 		TransactionPayment: pallet_transaction_payment::{Module, Storage},
 		Sudo: pallet_sudo::{Module, Call, Config<T>, Storage, Event<T>},
+
+		Authorities: pallet_authorities::{Module, Call, Storage, Config, Event<T>},
 		Likes: pallet_likes::{Module, Call, Storage, Event<T>},
 		Owners: pallet_owners::{Module, Call, Storage, Event<T>},
 	}
@@ -519,7 +537,8 @@ impl_runtime_apis! {
 		}
 
 		fn authorities() -> Vec<AuraId> {
-			Aura::authorities()
+			//Aura::authorities()
+			Authorities::list_aura()
 		}
 	}
 
@@ -537,7 +556,8 @@ impl_runtime_apis! {
 
 	impl fg_primitives::GrandpaApi<Block> for Runtime {
 		fn grandpa_authorities() -> GrandpaAuthorityList {
-			Grandpa::grandpa_authorities()
+			//Grandpa::grandpa_authorities()
+			Authorities::list_grandpa()
 		}
 
 		fn submit_report_equivocation_unsigned_extrinsic(

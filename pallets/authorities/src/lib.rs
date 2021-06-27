@@ -5,6 +5,13 @@
 // Imports
 // -------------------------------------------------
 
+use sp_std::prelude::*;
+
+use sp_std::{
+	vec::Vec,
+	convert::TryInto,
+};
+
 use frame_support::{
 	ensure,
 	decl_error, decl_event, decl_module, decl_storage
@@ -15,6 +22,21 @@ use frame_system::{
 };
 
 use wika_traits::AuthorityRegistry ;
+
+use sp_runtime::SaturatedConversion ;
+
+use sp_consensus_aura::sr25519::AuthorityId as AuraId;
+
+use pallet_grandpa::AuthorityId as GrandpaId;
+
+use parity_scale_codec::Decode ;
+
+
+
+
+
+
+
 
 
 
@@ -40,8 +62,14 @@ decl_storage! {
     	// Registered authorities
     	// 0. Block at which they were registered
     	// 1. Enabled true/false
-    	Authorities: map hasher(identity) T::AccountId => (T::BlockNumber, bool) ;
+    	// 2. sr25519 public address
+    	// 3. ed25519 public address
+    	Authorities: map hasher(identity) T::AccountId => (T::BlockNumber, bool, [u8;32], [u8;32]) ;
 	}
+	add_extra_genesis {
+        config(keys): Vec<([u8;32],[u8;32])>;
+        build(|config| Module::<T>::initialize_keys(&config.keys))
+    }
 }
 
 
@@ -94,11 +122,24 @@ decl_error! {
 // Implementation
 // -------------------------------------------------
 
-
 impl<T:Config> AuthorityRegistry<T> for Module<T> {
 
-	fn list_grandpa() {
+	fn list_aura() -> Vec<AuraId> {
+		let mut ans = vec![] ;
+		for (_,(_,_,addr,_)) in Authorities::<T>::iter() {
+			let public = sp_core::sr25519::Public::from_raw(addr) ;
+			ans.push(public.into()) ;
+		}
+		ans
+	}
 
+    fn list_grandpa() -> Vec<(GrandpaId, u64)> {
+		let mut ans = vec![] ;
+		for (_,(_,_,_,addr)) in Authorities::<T>::iter() {
+			let public = sp_core::ed25519::Public::from_raw(addr) ;
+			ans.push((public.into(), 1)) ;
+		}
+		ans
 	}
 
 }
@@ -106,6 +147,17 @@ impl<T:Config> AuthorityRegistry<T> for Module<T> {
 
 
 impl<T: Config> Module<T> {
+
+	fn initialize_keys(keys: &Vec<([u8;32],[u8;32])>) {
+		let count: u16 = keys.len().try_into().expect("small number") ;
+		AuthCount::set(count) ;
+		for (sr25519,ed25519) in keys {
+			let account: T::AccountId = T::AccountId::decode(&mut &sr25519[..]).expect("valid key") ;
+			let zero: u8 = 0 ;
+			let block: T::BlockNumber = zero.saturated_into() ;
+			Authorities::<T>::insert(&account, (block, true, sr25519, ed25519));
+		}
+	}
 
 	fn is_registered(who: &T::AccountId) -> bool {
 		Authorities::<T>::contains_key(who)
@@ -129,7 +181,7 @@ decl_module! {
 
 		// Add an authority
         #[weight = 10_000]
-        fn add_authority(origin, account: T::AccountId) {
+        fn add_authority(origin, account: T::AccountId, addr_sr25519: [u8;32], addr_ed25519: [u8;32]) {
             // Check that the extrinsic is from sudo.
             ensure_root(origin)?;
 
@@ -138,8 +190,12 @@ decl_module! {
 
 			// Add account as a new authority
 			let current_block = <frame_system::Module<T>>::block_number();
-			let authority = (current_block, true) ;
+			let authority = (current_block, true, addr_sr25519, addr_ed25519) ;
 			Authorities::<T>::insert(&account, authority);
+
+			// Update total count of authoritiess
+			let count = AuthCount::take() + 1 ;
+			AuthCount::set(count) ;
 
             // Emit an event that new validator was added.
             Self::deposit_event(RawEvent::AuthorityAdded(account));
@@ -165,7 +221,7 @@ decl_module! {
 
         // Enable an authority
         #[weight = 10_000]
-        fn enable_verifier(origin, account: T::AccountId) {
+        fn enable_authority(origin, account: T::AccountId) {
             // Check that the extrinsic is from sudo.
             ensure_root(origin)?;
 

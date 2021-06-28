@@ -1,0 +1,10 @@
+version: '3'
+services:
+  wika:
+    build: .
+    volumes:
+      - /var/db_wika:/var/db_wika
+    ports:
+      - 30333:30333
+      - 9945:9945
+      - 9933:9933

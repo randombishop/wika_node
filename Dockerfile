@@ -29,6 +29,7 @@ RUN /root/.cargo/bin/cargo build --release
 
 # Back to root directory
 WORKDIR /
+COPY ./start_chain .
 
 # Start the blockchain
 CMD python -m SimpleHTTPServer 8765

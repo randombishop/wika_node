@@ -6,14 +6,8 @@
 
 .DS_Store
 
-# The cache for docker container dependency
-.cargo
-
-# The cache for chain data in container
-.local
-
-# direnv cache
-.direnv
+# Cargo lock
+Cargo.lock
 
 # exclude PyCharm metadata
 .idea

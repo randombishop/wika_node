@@ -3,6 +3,8 @@ FROM debian:10-slim
 # Install dependencies
 RUN apt update
 RUN apt install -y git clang curl libssl-dev llvm libudev-dev
+RUN apt-get -y install procps
+RUN apt-get -y install vim
 
 # Install rust
 RUN mkdir install

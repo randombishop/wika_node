@@ -1,1 +1,1 @@
-nohup sudo docker-compose -f test1.yaml -p test1 up > /var/log/wika_docker.log &
+nohup sudo docker-compose -f test1.yaml -p test1 up > /dev/null 2> /dev/null &

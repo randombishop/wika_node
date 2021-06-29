@@ -5,11 +5,13 @@ services:
     volumes:
       - /var/db_wika:/var/db_wika
     environment:
+      - NODE_IP=x.x.x.x
       - NODE_NAME=node_test1
       - CHAIN_NAME=test
       - CHAIN_PORT=30333
       - WS_PORT=9945
       - RPC_PORT=9933
+      - BOOT_NODE_OPTION="--bootnodes /ip4/x.x.x.x/tcp/30333/p2p/xxxxx"
     ports:
       - 30333:30333
       - 9945:9945

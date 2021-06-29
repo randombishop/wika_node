@@ -5,11 +5,11 @@ services:
     volumes:
       - /var/db_wika:/var/db_wika
     environment:
-      - $NODE_NAME=node_test1
-      - $CHAIN_NAME=test
-      - $CHAIN_PORT=30333
-      - $WS_PORT=9945
-      - $RPC_PORT=9933
+      - NODE_NAME=node_test1
+      - CHAIN_NAME=test
+      - CHAIN_PORT=30333
+      - WS_PORT=9945
+      - RPC_PORT=9933
     ports:
       - 30333:30333
       - 9945:9945

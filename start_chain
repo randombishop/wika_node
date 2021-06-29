@@ -1,4 +1,4 @@
-/install/wika_node/target/release/wika-node \
+nohup /install/wika_node/target/release/wika-node \
     --base-path /var/db_wika/$NODE_NAME \
     --validator \
     --telemetry-url 'wss://telemetry.polkadot.io/submit/ 0' \
@@ -7,3 +7,4 @@
     --port $CHAIN_PORT \
     --ws-port $WS_PORT \
     --rpc-port $RPC_PORT \
+    > /var/log/$NODE_NAME.log &

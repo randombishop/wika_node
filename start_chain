@@ -1,12 +1,9 @@
-export NODE_NAME="test_node_1"
-export CHAIN_NAME="test"
-
 /install/wika_node/target/release/wika-node \
     --base-path /var/db_wika/$NODE_NAME \
     --validator \
     --telemetry-url 'wss://telemetry.polkadot.io/submit/ 0' \
     --name $NODE_NAME \
     --chain $CHAIN_NAME \
-    --port 30333 \
-    --ws-port 9945 \
-    --rpc-port 9933 \
+    --port $CHAIN_PORT \
+    --ws-port $WS_PORT \
+    --rpc-port $RPC_PORT \

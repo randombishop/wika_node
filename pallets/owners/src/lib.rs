@@ -181,16 +181,16 @@ fn find_majority<K,V: Ord>(list: &Vec<(K, V)>) -> Option<(&V,u32)> {
 // -------------------------------------------------
 
 fn fetch_from_url(url: &Vec<u8>) -> Option<Vec<u8>> {
-	log::debug!(target: "AUTHOR", "fetch_from_url url: {:?}", url);
+	log::debug!(target: "OWNERS", "fetch_from_url url: {:?}", url);
 
 	// Convert bytes to str
 	let url_str = sp_std::str::from_utf8(url) ;
 	if url_str.is_err() {
-		log::debug!(target: "AUTHOR", "fetch_from_url could not convert url bytes to str");
+		log::debug!(target: "OWNERS", "fetch_from_url could not convert url bytes to str");
 		return None ;
 	}
 	let url_str = url_str.unwrap() ;
-	log::debug!(target: "AUTHOR", "fetch_from_url url_str: {:?}", url_str);
+	log::debug!(target: "OWNERS", "fetch_from_url url_str: {:?}", url_str);
 
 	// Initiate an external HTTP GET request.
 	let request = rt_offchain::http::Request::get(url_str);
@@ -204,7 +204,7 @@ fn fetch_from_url(url: &Vec<u8>) -> Option<Vec<u8>> {
 		.deadline(timeout)
 		.send() ;
 	if pending.is_err() {
-		log::debug!(target: "AUTHOR", "fetch_from_url failed to send the request");
+		log::debug!(target: "OWNERS", "fetch_from_url failed to send the request");
 		return None ;
 	}
 	let pending = pending.unwrap() ;
@@ -214,20 +214,20 @@ fn fetch_from_url(url: &Vec<u8>) -> Option<Vec<u8>> {
 
 	// Unwrap twice
 	if response.is_err() {
-		log::debug!(target: "AUTHOR", "fetch_from_url failed to wait for the response");
+		log::debug!(target: "OWNERS", "fetch_from_url failed to wait for the response");
 		return None ;
 	}
 	let response = response.unwrap() ;
 	if response.is_err() {
-		log::debug!(target: "AUTHOR", "fetch_from_url failed to fetch the response");
+		log::debug!(target: "OWNERS", "fetch_from_url failed to fetch the response");
 		return None ;
 	}
 	let response = response.unwrap() ;
-	log::debug!(target: "AUTHOR", "fetch_from_url response code: {:?}", response.code);
+	log::debug!(target: "OWNERS", "fetch_from_url response code: {:?}", response.code);
 
 	// Make sure we have a 200
 	if response.code != 200 {
-		log::debug!(target: "AUTHOR", "fetch_from_url bad response");
+		log::debug!(target: "OWNERS", "fetch_from_url bad response");
 		return None ;
 	}
 

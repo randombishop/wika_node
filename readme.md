@@ -31,11 +31,13 @@ cargo build
 ```
 ./target/debug/wika-node --tmp --dev -lOWNERS=debug -lLIKE=debug
 ```
-Optionally add Alice's private keys to the owner pallet
-to enable offchain transactions.
+
+# Enabling offchain worker with Alice as a verifier
+1. Add Alice's private keys to the owner pallet.
 ```
 curl http://localhost:9933 -H "Content-Type:application/json;charset=utf-8" -d "@./dev_keys/alice_ownr.json"
 ```
+2. Use the owners pallet addVerifier transaction to add Alice public key as a verifier.
 
 
 # Start a test node

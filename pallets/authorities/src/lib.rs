@@ -189,7 +189,7 @@ decl_module! {
 			ensure!(!Self::is_registered(&account), Error::<T>::AuthorityAlreadyRegistered) ;
 
 			// Add account as a new authority
-			let current_block = <frame_system::Module<T>>::block_number();
+			let current_block = <frame_system::Pallet<T>>::block_number();
 			let authority = (current_block, true, addr_sr25519, addr_ed25519) ;
 			Authorities::<T>::insert(&account, authority);
 

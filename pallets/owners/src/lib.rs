@@ -12,11 +12,11 @@ use sp_std::{
 };
 
 use frame_support::{
-	debug,
 	ensure,
 	decl_error, decl_event, decl_module, decl_storage,
 	traits::{Currency, ExistenceRequirement, Get},
-	weights::Weight
+	weights::Weight,
+	PalletId
 };
 
 use frame_system::{
@@ -30,7 +30,6 @@ use frame_system::{
 };
 
 use sp_runtime::{
-	ModuleId,
 	SaturatedConversion,
 	RuntimeAppPublic,
 	traits::{
@@ -38,7 +37,10 @@ use sp_runtime::{
 	},
 	offchain as rt_offchain,
 	offchain::{
-		storage::StorageValueRef
+		storage::{
+		    StorageValueRef,
+		    StorageRetrievalError
+		}
 	},
 };
 
@@ -109,7 +111,7 @@ type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Con
 
 type PublicOf<T> = <T as Config>::OwnersPublic ;
 
-const PALLET_ID: ModuleId = ModuleId(*b"AUTHORS!");
+const PALLET_ID: PalletId = PalletId(*b"AUTHORS!");
 
 const HASH_LENGTH: usize = 32 ;
 
@@ -179,16 +181,16 @@ fn find_majority<K,V: Ord>(list: &Vec<(K, V)>) -> Option<(&V,u32)> {
 // -------------------------------------------------
 
 fn fetch_from_url(url: &Vec<u8>) -> Option<Vec<u8>> {
-	debug::debug!(target: "AUTHOR", "fetch_from_url url: {:?}", url);
+	log::debug!(target: "AUTHOR", "fetch_from_url url: {:?}", url);
 
 	// Convert bytes to str
 	let url_str = sp_std::str::from_utf8(url) ;
 	if url_str.is_err() {
-		debug::debug!(target: "AUTHOR", "fetch_from_url could not convert url bytes to str");
+		log::debug!(target: "AUTHOR", "fetch_from_url could not convert url bytes to str");
 		return None ;
 	}
 	let url_str = url_str.unwrap() ;
-	debug::debug!(target: "AUTHOR", "fetch_from_url url_str: {:?}", url_str);
+	log::debug!(target: "AUTHOR", "fetch_from_url url_str: {:?}", url_str);
 
 	// Initiate an external HTTP GET request.
 	let request = rt_offchain::http::Request::get(url_str);
@@ -202,7 +204,7 @@ fn fetch_from_url(url: &Vec<u8>) -> Option<Vec<u8>> {
 		.deadline(timeout)
 		.send() ;
 	if pending.is_err() {
-		debug::debug!(target: "AUTHOR", "fetch_from_url failed to send the request");
+		log::debug!(target: "AUTHOR", "fetch_from_url failed to send the request");
 		return None ;
 	}
 	let pending = pending.unwrap() ;
@@ -212,20 +214,20 @@ fn fetch_from_url(url: &Vec<u8>) -> Option<Vec<u8>> {
 
 	// Unwrap twice
 	if response.is_err() {
-		debug::debug!(target: "AUTHOR", "fetch_from_url failed to wait for the response");
+		log::debug!(target: "AUTHOR", "fetch_from_url failed to wait for the response");
 		return None ;
 	}
 	let response = response.unwrap() ;
 	if response.is_err() {
-		debug::debug!(target: "AUTHOR", "fetch_from_url failed to fetch the response");
+		log::debug!(target: "AUTHOR", "fetch_from_url failed to fetch the response");
 		return None ;
 	}
 	let response = response.unwrap() ;
-	debug::debug!(target: "AUTHOR", "fetch_from_url response code: {:?}", response.code);
+	log::debug!(target: "AUTHOR", "fetch_from_url response code: {:?}", response.code);
 
 	// Make sure we have a 200
 	if response.code != 200 {
-		debug::debug!(target: "AUTHOR", "fetch_from_url bad response");
+		log::debug!(target: "AUTHOR", "fetch_from_url bad response");
 		return None ;
 	}
 
@@ -283,18 +285,23 @@ impl OffchainCache {
 
 	fn add_reveal_to_existing_list(key: &[u8], item: RevealItem) {
 		let cache = StorageValueRef::persistent(key) ;
-		let update = cache.mutate(|o: Option<Option<Vec<RevealItem>>>| {
-			if let Some(Some(mut list)) = o {
-				list.push(item) ;
-				return Ok(list) ;
+		let update = cache.mutate(|status: Result<Option<Option<Vec<RevealItem>>>,StorageRetrievalError>| {
+			if status.is_ok() {
+			    let o = status.unwrap() ;
+			    if let Some(Some(mut list)) = o {
+                    list.push(item) ;
+                    return Ok(Some(list)) ;
+                } else {
+                    return Err(()) ;
+                }
 			} else {
-				return Err(()) ;
+			    return Err(()) ;
 			}
 		});
 		if update.is_err() {
-			debug::error!(target: "OWNERS", "OffchainCache list update failed: {:?}", sp_std::str::from_utf8(&key));
+			log::error!(target: "OWNERS", "OffchainCache list update failed: {:?}", sp_std::str::from_utf8(&key));
 		} else {
-			debug::debug!(target: "OWNERS", "OffchainCache list updated: {:?}", sp_std::str::from_utf8(&key));
+			log::debug!(target: "OWNERS", "OffchainCache list updated: {:?}", sp_std::str::from_utf8(&key));
 		}
 	}
 
@@ -302,19 +309,20 @@ impl OffchainCache {
 		let data: Vec<RevealItem> = sp_std::vec![item] ;
 		let cache = StorageValueRef::persistent(key) ;
 		cache.set(&data) ;
-		debug::debug!(target: "OWNERS", "OffchainCache new list created: {:?}", sp_std::str::from_utf8(key));
+		log::debug!(target: "OWNERS", "OffchainCache new list created: {:?}", sp_std::str::from_utf8(key));
 	}
 
 	pub fn save_reveal_at_block(url: &Vec<u8>, block_number: u32, vote: bool, intro: &Vec<u8>, proof: Option<&Vec<u8>>, salt: &Vec<u8>) {
 		// Prepare to save
-		debug::debug!(target: "OWNERS", "OffchainCache saving a new reveal at block: {:?}", block_number);
+		log::debug!(target: "OWNERS", "OffchainCache saving a new reveal at block: {:?}", block_number);
 		let key = Self::key_reveals_at_block(block_number) ;
-		debug::debug!(target: "OWNERS", "OffchainCache storage key: {:?}", sp_std::str::from_utf8(&key));
+		log::debug!(target: "OWNERS", "OffchainCache storage key: {:?}", sp_std::str::from_utf8(&key));
 		let reveal = RevealItem::new(url, vote, intro, proof, salt) ;
 
 		// Save to new list or add to existing one
 		let cache = StorageValueRef::persistent(&key);
-		if let Some(Some(_)) = cache.get::<Vec<bool>>() {
+		let cache_get = cache.get::<Vec<bool>>() ;
+		if cache_get.is_ok() {
 			Self::add_reveal_to_existing_list(&key, reveal) ;
 		} else {
 			Self::add_reveal_to_new_list(&key, reveal) ;
@@ -323,10 +331,15 @@ impl OffchainCache {
 
 	pub fn get_reveal_list(block_number: u32) -> Vec<RevealItem> {
 		let key = Self::key_reveals_at_block(block_number) ;
-		debug::debug!(target: "OWNERS", "OffchainCache take_reveal_list key: {:?}", sp_std::str::from_utf8(&key));
-		let cache = StorageValueRef::persistent(&key);
-		if let Some(Some(list)) = cache.get::<Vec<RevealItem>>() {
-			return list ;
+		log::debug!(target: "OWNERS", "OffchainCache take_reveal_list key: {:?}", sp_std::str::from_utf8(&key));
+		let cache = StorageValueRef::persistent(&key) ;
+		let cache_get = cache.get::<Vec<RevealItem>>() ;
+		if cache_get.is_ok() {
+		    if let Some(list) = cache_get.unwrap() {
+		        return list ;
+		    } else {
+		        return sp_std::vec![] ;
+		    }
 		} else {
 			return sp_std::vec![] ;
 		}
@@ -336,7 +349,7 @@ impl OffchainCache {
 		let key = Self::key_reveals_at_block(block_number) ;
 		let mut cache = StorageValueRef::persistent(&key);
 		cache.clear() ;
-		debug::debug!(target: "OWNERS", "OffchainCache list deleted: {:?}", sp_std::str::from_utf8(&key));
+		log::debug!(target: "OWNERS", "OffchainCache list deleted: {:?}", sp_std::str::from_utf8(&key));
 	}
 
 }
@@ -562,7 +575,7 @@ impl<T: Config> Module<T> {
 	}
 
 	fn send_to_pot(sender: &T::AccountId, amount: BalanceOf<T>) {
-		debug::debug!(target: "OWNERS", "Sending likes to pot: {:?}", amount);
+		log::debug!(target: "OWNERS", "Sending likes to pot: {:?}", amount);
 		T::Currency::transfer(sender,
 							  &Self::get_pot_id(),
 							  amount,
@@ -574,7 +587,7 @@ impl<T: Config> Module<T> {
 		for x in keys {
 			let bytes: [u8; 32] = x.as_ref().try_into().expect("cant fail") ;
 			let account: T::AccountId = T::AccountId::decode(&mut &bytes[..]).expect("never fails") ;
-			debug::debug!(target: "OWNERS", "offchain_worker account: {:?}", &account);
+			log::debug!(target: "OWNERS", "offchain_worker account: {:?}", &account);
 			if Self::is_verifier_enabled(&account) {
 				return Some(bytes) ;
 			}
@@ -583,12 +596,12 @@ impl<T: Config> Module<T> {
 	}
 
 	fn check_url_offchain(url: &Vec<u8>, requester: &T::AccountId, requested_at: T::BlockNumber) {
-		debug::debug!(target: "OWNERS", "check_url_offchain: {:?}", url);
+		log::debug!(target: "OWNERS", "check_url_offchain: {:?}", url);
 
 		// Fetch data from url
 		let bytes = fetch_from_url(url) ;
 		if bytes.is_none() {
-			debug::debug!(target: "OWNERS", "check_url_offchain could not fetch data from url");
+			log::debug!(target: "OWNERS", "check_url_offchain could not fetch data from url");
 			return ;
 		}
 		let bytes = bytes.unwrap() ;
@@ -596,54 +609,54 @@ impl<T: Config> Module<T> {
 		// Convert to str
 		let data = sp_std::str::from_utf8(&bytes) ;
 		if data.is_err() {
-			debug::debug!(target: "OWNERS", "check_url_offchain could not convert bytes to str");
+			log::debug!(target: "OWNERS", "check_url_offchain could not convert bytes to str");
 			return ;
 		}
 		let data = data.unwrap() ;
 
 		// Intro part
 		let intro = &data[..INTRO_LENGTH] ;
-		debug::debug!(target: "OWNERS", "check_url_offchain intro: {:?}", intro);
+		log::debug!(target: "OWNERS", "check_url_offchain intro: {:?}", intro);
 		let intro: Vec<u8> = intro.into() ;
 
 		// Mark part
 		let mark_idx = data.find(MARK_PREFIX) ;
 		if mark_idx.is_none() {
-			debug::debug!(target: "OWNERS", "check_url_offchain mark not found, voting NO");
+			log::debug!(target: "OWNERS", "check_url_offchain mark not found, voting NO");
 			Self::send_commit_offchain(url, requested_at, false, &intro, None) ;
 			return ;
 		}
 		let mark_idx = mark_idx.unwrap() ;
 		let mark_str = &data[mark_idx..mark_idx+MARK_LENGTH] ;
-		debug::debug!(target: "OWNERS", "check_url_offchain mark_str: {:?}", mark_str);
+		log::debug!(target: "OWNERS", "check_url_offchain mark_str: {:?}", mark_str);
 
 		// Check that the mark contains the address
-		debug::debug!(target: "OWNERS", "check_url_offchain requester: {:?}", &requester);
+		log::debug!(target: "OWNERS", "check_url_offchain requester: {:?}", &requester);
 		let address: [u8; 32] = requester.encode().try_into().expect("address is always 32") ;
 		let mut address_hex: [u8; 64] = [0; 64] ;
 		let conversion = hex::encode_to_slice(address, &mut address_hex) ;
 		if conversion.is_err() {
-			debug::debug!(target: "OWNERS", "check_url_offchain could not convert address to hex");
+			log::debug!(target: "OWNERS", "check_url_offchain could not convert address to hex");
 			return ;
 		}
 		let address = sp_std::str::from_utf8(&address_hex) ;
 		if address.is_err() {
-			debug::debug!(target: "OWNERS", "check_url_offchain could not convert address to str");
+			log::debug!(target: "OWNERS", "check_url_offchain could not convert address to str");
 			return ;
 		}
 		let address = address.unwrap() ;
-		debug::debug!(target: "OWNERS", "check_url_offchain address: {:?}", &address);
+		log::debug!(target: "OWNERS", "check_url_offchain address: {:?}", &address);
 		let address_idx = mark_str.find(&address) ;
 		if address_idx.is_none() {
-			debug::debug!(target: "OWNERS", "check_url_offchain mark address does not match, voting NO");
+			log::debug!(target: "OWNERS", "check_url_offchain mark address does not match, voting NO");
 			Self::send_commit_offchain(url, requested_at, false, &intro, None) ;
 			return ;
 		}
 
 		// Valid mark found, let's vote YES
 		let proof: Vec<u8> = mark_str.into() ;
-		debug::debug!(target: "OWNERS", "check_url_offchain voting YES");
-		&Self::send_commit_offchain(url, requested_at, true, &intro, Some(&proof)) ;
+		log::debug!(target: "OWNERS", "check_url_offchain voting YES");
+		Self::send_commit_offchain(url, requested_at, true, &intro, Some(&proof)) ;
 	}
 
 	fn concat_data1(vote: bool, intro: &Vec<u8>, proof: Option<&Vec<u8>>) -> Vec<u8> {
@@ -683,28 +696,28 @@ impl<T: Config> Module<T> {
 	fn send_commit_offchain(url: &Vec<u8>, requested_at: T::BlockNumber, vote: bool, intro: &Vec<u8>, proof: Option<&Vec<u8>>) {
 		// Concatenate the 3 parameters
 		let concat1: Vec<u8> = Self::concat_data1(vote, intro, proof) ;
-		debug::debug!(target: "OWNERS", "send_commit_offchain concat1.len(): {:?}", concat1.len());
-		debug::debug!(target: "OWNERS", "send_commit_offchain concat1: {:?}", &concat1);
+		log::debug!(target: "OWNERS", "send_commit_offchain concat1.len(): {:?}", concat1.len());
+		log::debug!(target: "OWNERS", "send_commit_offchain concat1: {:?}", &concat1);
 
 		// Sign this part to get the salt
 		let verifier = Self::get_local_verifier() ;
 		if verifier.is_none() {
-			debug::debug!(target: "OWNERS", "send_commit_offchain unable to find verifier");
+			log::debug!(target: "OWNERS", "send_commit_offchain unable to find verifier");
 			return ;
 		}
 		let verifier = verifier.unwrap() ;
 		let verifier = sp_core::sr25519::Public::from_raw(verifier) ;
 		let sign = sp_io::crypto::sr25519_sign(KEY_TYPE, &verifier, &concat1) ;
 		if sign.is_none() {
-			debug::debug!(target: "OWNERS", "send_commit_offchain unable to sign params");
+			log::debug!(target: "OWNERS", "send_commit_offchain unable to sign params");
 			return ;
 		}
 		let salt = sign.unwrap() ;
-		debug::debug!(target: "OWNERS", "send_commit_offchain salt as signature: {:?}", &salt);
+		log::debug!(target: "OWNERS", "send_commit_offchain salt as signature: {:?}", &salt);
 		let salt: Vec<u8> = salt.encode() ;
 		//let salt: Vec<u8> = salt[0..64].into() ;
-		debug::debug!(target: "OWNERS", "send_commit_offchain salt.len: {:?}", salt.len());
-		debug::debug!(target: "OWNERS", "send_commit_offchain salt: {:?}", &salt);
+		log::debug!(target: "OWNERS", "send_commit_offchain salt.len: {:?}", salt.len());
+		log::debug!(target: "OWNERS", "send_commit_offchain salt: {:?}", &salt);
 
 		// Concatenate all 4 params now
 		let concat2: Vec<u8> = Self::concat_data2(vote, intro, proof, &salt) ;
@@ -716,11 +729,11 @@ impl<T: Config> Module<T> {
 
 		// Check that it's still time to commit
 		let current_block = Self::current_block_number() ;
-		debug::error!(target: "OWNERS", "send_commit_offchain current_block: {:?}", current_block);
+		log::error!(target: "OWNERS", "send_commit_offchain current_block: {:?}", current_block);
 		let param = u8_to_block::<T>(NumBlocksToCommit::get()) ;
 		let max_block = requested_at + param ;
 		if current_block>=max_block {
-			debug::debug!(target: "OWNERS", "send_commit_offchain too late to commit");
+			log::debug!(target: "OWNERS", "send_commit_offchain too late to commit");
 			return ;
 		}
 		let reveal_at = block_to_u32::<T>(max_block) ;
@@ -730,13 +743,13 @@ impl<T: Config> Module<T> {
 		let result = signer.send_signed_transaction(|_acct| Call::commit_verification(url.clone(), commit_hash.clone()));
 		if let Some((acc, res)) = result {
 			if res.is_err() {
-				debug::error!(target: "OWNERS", "send_commit_offchain TRANSACTION FAILED. account id: {:?}", acc.id);
+				log::error!(target: "OWNERS", "send_commit_offchain TRANSACTION FAILED. account id: {:?}", acc.id);
 			} else {
-				debug::debug!(target: "OWNERS", "send_commit_offchain SUCCESS");
+				log::debug!(target: "OWNERS", "send_commit_offchain SUCCESS");
 				OffchainCache::save_reveal_at_block(url, reveal_at, vote, intro, proof, &salt) ;
 			}
 		} else {
-			debug::error!(target: "OWNERS", "send_commit_offchain No local account to submit transaction");
+			log::error!(target: "OWNERS", "send_commit_offchain No local account to submit transaction");
 		}
 	}
 
@@ -746,7 +759,7 @@ impl<T: Config> Module<T> {
 
 		// Check that the Request is still pending
 		if !Requests::<T>::contains_key(url) {
-			debug::debug!(target: "OWNERS", "send_reveal_offchain request not found");
+			log::debug!(target: "OWNERS", "send_reveal_offchain request not found");
 			return ;
 		}
 
@@ -762,11 +775,11 @@ impl<T: Config> Module<T> {
 		// Note that at this point current_block is already finalized so it's ok to trigger the tx now,
 		// it can only be included in next block, thus current_block>=min_block
 		// and not >
-		debug::debug!(target: "OWNERS", "send_reveal_offchain request_block: {:?}", request_block);
-		debug::debug!(target: "OWNERS", "send_reveal_offchain current_block: {:?}", current_block);
-		debug::debug!(target: "OWNERS", "send_reveal_offchain max_block: {:?}", max_block);
+		log::debug!(target: "OWNERS", "send_reveal_offchain request_block: {:?}", request_block);
+		log::debug!(target: "OWNERS", "send_reveal_offchain current_block: {:?}", current_block);
+		log::debug!(target: "OWNERS", "send_reveal_offchain max_block: {:?}", max_block);
 		if !timing_ok {
-			debug::debug!(target: "OWNERS", "send_reveal_offchain too late to reveal");
+			log::debug!(target: "OWNERS", "send_reveal_offchain too late to reveal");
 			return ;
 		}
 
@@ -780,25 +793,25 @@ impl<T: Config> Module<T> {
 		});
 		if let Some((acc, res)) = result {
 			if res.is_err() {
-				debug::error!(target: "OWNERS", "send_reveal_offchain TRANSACTION FAILED. account id: {:?}", acc.id);
+				log::error!(target: "OWNERS", "send_reveal_offchain TRANSACTION FAILED. account id: {:?}", acc.id);
 			} else {
-				debug::debug!(target: "OWNERS", "send_reveal_offchain SUCCESS");
+				log::debug!(target: "OWNERS", "send_reveal_offchain SUCCESS");
 			}
 		} else {
-			debug::error!(target: "OWNERS", "send_reveal_offchain No local account to submit transaction");
+			log::error!(target: "OWNERS", "send_reveal_offchain No local account to submit transaction");
 		}
 	}
 
 	fn aggregate_votes(current_block: T::BlockNumber) {
-		debug::debug!(target: "OWNERS", "aggregate_votes current_block: {:?}", current_block);
+		log::debug!(target: "OWNERS", "aggregate_votes current_block: {:?}", current_block);
 		let param1 = u8_to_block::<T>(NumBlocksToCommit::get()) ;
 		let param2 = u8_to_block::<T>(NumBlocksToReveal::get()) ;
 		let delta = param1+param2+u8_to_block::<T>(1) ;
 		if current_block>delta {
 			let block = current_block - delta ;
-			debug::debug!(target: "OWNERS", "aggregate_votes block: {:?}", block);
+			log::debug!(target: "OWNERS", "aggregate_votes block: {:?}", block);
 			let requests = History::<T>::get(block) ;
-			debug::debug!(target: "OWNERS", "aggregate_votes requests.len(): {:?}", requests.len());
+			log::debug!(target: "OWNERS", "aggregate_votes requests.len(): {:?}", requests.len());
 			for url in requests {
 				Self::aggregate_votes_for_request(url) ;
 			}
@@ -806,10 +819,10 @@ impl<T: Config> Module<T> {
 	}
 
 	fn aggregate_votes_for_request(url: Vec<u8>) {
-		debug::debug!(target: "OWNERS", "aggregate_votes_for_request url: {:?}", sp_std::str::from_utf8(&url));
+		log::debug!(target: "OWNERS", "aggregate_votes_for_request url: {:?}", sp_std::str::from_utf8(&url));
 		let reveals = Reveals::<T>::iter_prefix(&url).collect::<Vec<(T::AccountId, (bool, Vec<u8>, Vec<u8>))>>() ;
 		let total: u32 = reveals.len().try_into().expect("should always fit in 32") ;
-		debug::debug!(target: "OWNERS", "aggregate_votes_for_request total: {:?}", total);
+		log::debug!(target: "OWNERS", "aggregate_votes_for_request total: {:?}", total);
 		if total==0 {
 			return ;
 		}
@@ -817,16 +830,16 @@ impl<T: Config> Module<T> {
 		// Define majority
 		let majority = find_majority(&reveals).unwrap() ;
 		let ((vote, intro, proof), count_majority) = majority ;
-		debug::debug!(target: "OWNERS", "aggregate_votes_for_request majority count_majority: {:?}", count_majority);
+		log::debug!(target: "OWNERS", "aggregate_votes_for_request majority count_majority: {:?}", count_majority);
 		let prct: u32 = count_majority*100/total ;
-		debug::debug!(target: "OWNERS", "aggregate_votes_for_request majority prct: {:?}", prct);
+		log::debug!(target: "OWNERS", "aggregate_votes_for_request majority prct: {:?}", prct);
 
 		// Count number of yes votes
 		let mut count_yes: u32 = 0 ;
 		for (_,(v,_,_)) in &reveals {
 			if *v { count_yes += 1 ; }
 		}
-		debug::debug!(target: "OWNERS", "aggregate_votes_for_request majority count_yes: {:?}", count_yes);
+		log::debug!(target: "OWNERS", "aggregate_votes_for_request majority count_yes: {:?}", count_yes);
 
 		// Save the results
 		let bar: u32 = PrctNeededForAgreement::get().into() ;
@@ -846,7 +859,7 @@ impl<T: Config> Module<T> {
 		// Update verifiers' stats if prct majority passed the bar
 		// If not, these votes won't count in the verifier stats
 		if prct>bar {
-			debug::debug!(target: "OWNERS", "aggregate_votes_for_request votes are valid");
+			log::debug!(target: "OWNERS", "aggregate_votes_for_request votes are valid");
 			for (account, (r_vote, r_intro, r_proof)) in &reveals {
 				let mut stats = Verifiers::<T>::get(account) ;
 				stats.6 += 1 ;
@@ -865,36 +878,36 @@ impl<T: Config> Module<T> {
 		// - Majority represents at least PrctNeededForAgreement
 		// - Majority is at least MajorityMin
 		if outcome {
-			debug::debug!(target: "OWNERS", "aggregate_votes_for_request ownership approved") ;
+			log::debug!(target: "OWNERS", "aggregate_votes_for_request ownership approved") ;
 			let (_, owner) = Requests::<T>::get(&url) ;
 			Owners::<T>::insert(&url, owner) ;
 		}
-		debug::debug!(target: "OWNERS", "aggregate_votes_for_request DONE");
+		log::debug!(target: "OWNERS", "aggregate_votes_for_request DONE");
 	}
 
 	fn clean_up(current_block: T::BlockNumber) {
-		debug::debug!(target: "OWNERS", "clean_up current_block: {:?}", current_block);
+		log::debug!(target: "OWNERS", "clean_up current_block: {:?}", current_block);
 		let param1 = u8_to_block::<T>(NumBlocksToCommit::get()) ;
 		let param2 = u8_to_block::<T>(NumBlocksToReveal::get()) ;
 		let param3 = u8_to_block::<T>(NumBlocksToDelete::get()) ;
 		let delta = param1+param2+param3+u8_to_block::<T>(1) ;
 		if current_block>delta {
 			let block = current_block - delta ;
-			debug::debug!(target: "OWNERS", "clean_up block: {:?}", block);
+			log::debug!(target: "OWNERS", "clean_up block: {:?}", block);
 			let urls = History::<T>::take(block) ;
 			for url in urls {
-				debug::debug!(target: "OWNERS", "clean_up url: {:?}", sp_std::str::from_utf8(&url));
+				log::debug!(target: "OWNERS", "clean_up url: {:?}", sp_std::str::from_utf8(&url));
 				Requests::<T>::remove(&url) ;
-				Commits::<T>::remove_prefix(&url) ;
-				Reveals::<T>::remove_prefix(&url) ;
+				Commits::<T>::remove_prefix(&url, None) ;
+				Reveals::<T>::remove_prefix(&url, None) ;
 				Results::<T>::remove(&url) ;
 			}
 		}
-		debug::debug!(target: "OWNERS", "clean_up DONE");
+		log::debug!(target: "OWNERS", "clean_up DONE");
 	}
 
 	fn current_block_number() -> T::BlockNumber {
-		<frame_system::Module<T>>::block_number()
+		<frame_system::Pallet<T>>::block_number()
 	}
 
 }
@@ -910,7 +923,7 @@ decl_module! {
 
 		// Process previous requests
 		fn on_initialize(current_block: T::BlockNumber) -> Weight {
-			debug::debug!(target: "OWNERS", "on_initialize");
+			log::debug!(target: "OWNERS", "on_initialize");
 			// Aggregate votes for previous requests
 			Self::aggregate_votes(current_block) ;
 			// Clean up history, requests, commits, reveals and results
@@ -923,8 +936,8 @@ decl_module! {
         fn test_tx(origin, number:u64) {
             // Check that the extrinsic was signed and get the signer.
             let sender = ensure_signed(origin)?;
-			debug::debug!(target: "OWNERS", "test_tx sender: {:?}", &sender);
-			debug::debug!(target: "OWNERS", "test_tx number: {:?}", &number);
+			log::debug!(target: "OWNERS", "test_tx sender: {:?}", &sender);
+			log::debug!(target: "OWNERS", "test_tx number: {:?}", &number);
         }
 
 		// Add a validator
@@ -937,7 +950,7 @@ decl_module! {
 			ensure!(!Self::is_verifier_registered(&account), Error::<T>::VerifierAlreadyRegistered) ;
 
 			// Add account as a new verifier
-			let current_block = <frame_system::Module<T>>::block_number();
+			let current_block = <frame_system::Pallet<T>>::block_number();
 			let verifier = (current_block, true, 0, 0, 0, 0, 0, 0, 0) ;
 			Verifiers::<T>::insert(&account, verifier);
 
@@ -1002,9 +1015,9 @@ decl_module! {
 			Self::send_to_pot(&sender, price) ;
 
 			// Insert the URL in the check request queue at current block
-			let current_block = <frame_system::Module<T>>::block_number();
+			let current_block = <frame_system::Pallet<T>>::block_number();
 			Self::create_request(&current_block, &url, &sender) ;
-			debug::debug!(target: "OWNERS", "request_url_check inserted at block: {:?}", &current_block);
+			log::debug!(target: "OWNERS", "request_url_check inserted at block: {:?}", &current_block);
 
             // Emit an event that UrlCheckRequest was recorded.
             Self::deposit_event(RawEvent::UrlCheckRequested(sender, url));
@@ -1014,8 +1027,8 @@ decl_module! {
         #[weight = 10_000]
         fn commit_verification(origin, url: Vec<u8>, hash: Vec<u8>) {
         	// Print params for debugginng purposes
-        	debug::debug!(target: "OWNERS", "commit_verification url: {:?}", &url);
-        	debug::debug!(target: "OWNERS", "commit_verification hash: {:?}", &hash);
+        	log::debug!(target: "OWNERS", "commit_verification url: {:?}", &url);
+        	log::debug!(target: "OWNERS", "commit_verification hash: {:?}", &hash);
 
             // Check that the extrinsic was signed and get the signer.
             let sender = ensure_signed(origin)?;
@@ -1035,15 +1048,15 @@ decl_module! {
 			let param = u8_to_block::<T>(NumBlocksToCommit::get()) ;
 			let max_block = request_block + param ;
 			let timing_ok = current_block>request_block && current_block<=max_block ;
-			debug::debug!(target: "OWNERS", "commit_verification current_block: {:?}", &current_block);
-			debug::debug!(target: "OWNERS", "commit_verification request_block: {:?}", &request_block);
-			debug::debug!(target: "OWNERS", "commit_verification max_block: {:?}", &max_block);
+			log::debug!(target: "OWNERS", "commit_verification current_block: {:?}", &current_block);
+			log::debug!(target: "OWNERS", "commit_verification request_block: {:?}", &request_block);
+			log::debug!(target: "OWNERS", "commit_verification max_block: {:?}", &max_block);
 			ensure!(timing_ok, Error::<T>::OffTimeToCommit) ;
 
 			// Save the commit
 			let hash_array: [u8; 32] = hash.try_into().expect("length already checked") ;
 			Commits::<T>::insert(&url, &sender, hash_array);
-			debug::debug!(target: "OWNERS", "commit_verification commit saved!");
+			log::debug!(target: "OWNERS", "commit_verification commit saved!");
 
 			// Update verifier stats
 			let mut stats = Verifiers::<T>::take(&sender);
@@ -1051,7 +1064,7 @@ decl_module! {
 			let n_blocks:u32 = block_to_u32::<T>(current_block-request_block)  ;
 			stats.3 += n_blocks ;
 			Verifiers::<T>::insert(&sender, &stats);
-			debug::debug!(target: "OWNERS", "commit_verification updated stats: {:?}", &stats);
+			log::debug!(target: "OWNERS", "commit_verification updated stats: {:?}", &stats);
 
             // Emit an event that the commit was recorded.
             Self::deposit_event(RawEvent::UrlCheckCommitted(sender, url));
@@ -1062,8 +1075,8 @@ decl_module! {
         fn reveal_verification(origin, url: Vec<u8>,
         					   vote: bool, intro: Vec<u8>, proof: Vec<u8>, salt: Vec<u8>) {
         	// Print params for debugging purposes
-			debug::debug!(target: "OWNERS", "reveal_verification url: {:?}", &url);
-        	debug::debug!(target: "OWNERS", "reveal_verification vote: {:?}", &vote);
+			log::debug!(target: "OWNERS", "reveal_verification url: {:?}", &url);
+        	log::debug!(target: "OWNERS", "reveal_verification vote: {:?}", &vote);
 
         	// Check that the extrinsic was signed and get the signer.
             let sender = ensure_signed(origin)?;
@@ -1086,23 +1099,23 @@ decl_module! {
 				ensure!(proof.len()==MARK_LENGTH, Error::<T>::InvalidProofOfOwnership) ;
 
 				// Check that the proof has cocontains the account address
-				debug::debug!(target: "OWNERS", "reveal_verification request_account: {:?}", &request_account);
-				debug::debug!(target: "OWNERS", "reveal_verification proof: {:?}", &proof);
+				log::debug!(target: "OWNERS", "reveal_verification request_account: {:?}", &request_account);
+				log::debug!(target: "OWNERS", "reveal_verification proof: {:?}", &proof);
 				// TODO
 				ensure!(true, Error::<T>::InvalidProofOfOwnership) ;
 			}
 
 			// Check that it's a good time to receive reveals
-			let current_block = <frame_system::Module<T>>::block_number();
+			let current_block = <frame_system::Pallet<T>>::block_number();
 			let param1 = u8_to_block::<T>(NumBlocksToCommit::get()) ;
 			let param2 = u8_to_block::<T>(NumBlocksToReveal::get()) ;
 			let min_block = request_block + param1 ;
 			let max_block = request_block + param1 + param2 ;
 			let timing_ok = current_block>min_block && current_block<=max_block ;
-			debug::debug!(target: "OWNERS", "reveal_verification current_block: {:?}", &current_block);
-			debug::debug!(target: "OWNERS", "reveal_verification min_block: {:?}", &min_block);
-			debug::debug!(target: "OWNERS", "reveal_verification max_block: {:?}", &max_block);
-			debug::debug!(target: "OWNERS", "reveal_verification timing_ok: {:?}", &timing_ok);
+			log::debug!(target: "OWNERS", "reveal_verification current_block: {:?}", &current_block);
+			log::debug!(target: "OWNERS", "reveal_verification min_block: {:?}", &min_block);
+			log::debug!(target: "OWNERS", "reveal_verification max_block: {:?}", &max_block);
+			log::debug!(target: "OWNERS", "reveal_verification timing_ok: {:?}", &timing_ok);
 			ensure!(timing_ok, Error::<T>::OffTimeToReveal) ;
 
             // Check that the result was previously committed
@@ -1114,19 +1127,19 @@ decl_module! {
             	false => None
             } ;
             let concat1 = Self::concat_data1(vote, &intro, proof_option) ;
-            debug::debug!(target: "OWNERS", "reveal_verification concat1.len(): {:?}", concat1.len());
-            debug::debug!(target: "OWNERS", "reveal_verification concat1: {:?}", &concat1);
+            log::debug!(target: "OWNERS", "reveal_verification concat1.len(): {:?}", concat1.len());
+            log::debug!(target: "OWNERS", "reveal_verification concat1: {:?}", &concat1);
 
 			// Check that the salt is a valid signature
             let account_bytes: [u8; 32] = sender.encode().try_into().expect("account len is 32") ;
             let account_public: sp_core::sr25519::Public = sp_core::sr25519::Public::from_raw(account_bytes) ;
-            debug::debug!(target: "OWNERS", "reveal_verification account_public: {:?}", &account_public);
-            debug::debug!(target: "OWNERS", "reveal_verification salt.len(): {:?}", salt.len());
+            log::debug!(target: "OWNERS", "reveal_verification account_public: {:?}", &account_public);
+            log::debug!(target: "OWNERS", "reveal_verification salt.len(): {:?}", salt.len());
 			let signature_bytes: Result<[u8; 64],_> = salt.clone().try_into() ;
 			ensure!(signature_bytes.is_ok(), Error::<T>::InvalidSalt) ;
 			let signature_bytes: [u8; 64] = signature_bytes.unwrap() ;
             let signature = sp_core::sr25519::Signature::from_raw(signature_bytes) ;
-            debug::debug!(target: "OWNERS", "reveal_verification salt as signature: {:?}", &signature);
+            log::debug!(target: "OWNERS", "reveal_verification salt as signature: {:?}", &signature);
 
             // Check that the salt is actually the signature for the first 3 params
 			let valid_salt = sp_io::crypto::sr25519_verify(&signature, &concat1, &account_public) ;
@@ -1135,13 +1148,13 @@ decl_module! {
 			// Check that the reveal is consistent with commit
 			let concat2 = Self::concat_data2(vote, &intro, proof_option, &salt) ;
             let reveal_hash = keccak_256(&concat2);
-            debug::debug!(target: "OWNERS", "reveal_verification reveal_hash: {:?}", &reveal_hash);
+            log::debug!(target: "OWNERS", "reveal_verification reveal_hash: {:?}", &reveal_hash);
             let commit = Commits::<T>::get(&url, &sender) ;
             ensure!(reveal_hash==commit, Error::<T>::MismatchBetweenCommitAndReveal) ;
 
 			// Save the reveal
 			Reveals::<T>::insert(&url, &sender, (vote, intro, proof));
-			debug::debug!(target: "OWNERS", "reveal_verification reveal saved!");
+			log::debug!(target: "OWNERS", "reveal_verification reveal saved!");
 
 			// Update verifier stats
 			let mut stats = Verifiers::<T>::take(&sender);
@@ -1149,7 +1162,7 @@ decl_module! {
 			let n_blocks:u32 = block_to_u32::<T>(current_block-min_block) ;
 			stats.5 += n_blocks ;
 			Verifiers::<T>::insert(&sender, &stats);
-			debug::debug!(target: "OWNERS", "reveal_verification updated stats: {:?}", &stats);
+			log::debug!(target: "OWNERS", "reveal_verification updated stats: {:?}", &stats);
 
             // Emit an event that the commit was recorded.
             Self::deposit_event(RawEvent::UrlCheckRevealed(sender, url));
@@ -1161,17 +1174,17 @@ decl_module! {
         // - Send reveals when it's time
 		fn offchain_worker(block_number: T::BlockNumber) {
 			// Check verifier status
-			debug::debug!(target: "OWNERS", "offchain_worker checking node account");
+			log::debug!(target: "OWNERS", "offchain_worker checking node account");
 
 			let account = Self::get_local_verifier() ;
 			if account.is_none() {
-				debug::debug!(target: "OWNERS", "offchain_worker is OFF");
+				log::debug!(target: "OWNERS", "offchain_worker is OFF");
 				return ;
 			}
-			debug::debug!(target: "OWNERS", "offchain_worker is ON");
+			log::debug!(target: "OWNERS", "offchain_worker is ON");
 
 			// Process URL checks and send commits
-			debug::debug!(target: "OWNERS", "offchain_worker *** processing checks and commits ***");
+			log::debug!(target: "OWNERS", "offchain_worker *** processing checks and commits ***");
 			let requests = History::<T>::get(block_number) ;
 			for url in requests.iter() {
 				let request = Requests::<T>::get(&url) ;
@@ -1179,15 +1192,15 @@ decl_module! {
 				let requester = request.1 ;
 				Self::check_url_offchain(&url, &requester, requested_at) ;
 			}
-			debug::debug!(target: "OWNERS", "offchain_worker *** checks and commits DONE ***");
+			log::debug!(target: "OWNERS", "offchain_worker *** checks and commits DONE ***");
 
 			// Send reveals
-			debug::debug!(target: "OWNERS", "offchain_worker *** processing reveals ***");
+			log::debug!(target: "OWNERS", "offchain_worker *** processing reveals ***");
 			let block_number32 = block_to_u32::<T>(block_number) ;
 			let reveals = OffchainCache::get_reveal_list(block_number32) ;
-			debug::debug!(target: "OWNERS", "offchain_worker num reveals found: {:?}", reveals.len());
+			log::debug!(target: "OWNERS", "offchain_worker num reveals found: {:?}", reveals.len());
 			for r in reveals {
-				debug::debug!(target: "OWNERS", "offchain_worker revealing: {:?}", r);
+				log::debug!(target: "OWNERS", "offchain_worker revealing: {:?}", r);
 				let proof = match r.proof {
 					Some(x) => x,
 					None => sp_std::vec![]
@@ -1195,10 +1208,10 @@ decl_module! {
 				Self::send_reveal_offchain(&r.url, r.vote, &r.intro, &proof, &r.salt) ;
 			}
 			OffchainCache::delete_reveal_list(block_number32) ;
-			debug::debug!(target: "OWNERS", "offchain_worker *** reveals DONE ***");
+			log::debug!(target: "OWNERS", "offchain_worker *** reveals DONE ***");
 
 			// Finish
-			debug::debug!(target: "OWNERS", "offchain_worker DONE");
+			log::debug!(target: "OWNERS", "offchain_worker DONE");
 		}
 
 	}

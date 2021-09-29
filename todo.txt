@@ -1,1 +1,0 @@
-- Dockerfile, clean up Google cloud, and deploy test and main nets.

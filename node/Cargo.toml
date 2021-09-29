@@ -18,16 +18,19 @@ name = "wika-node"
 [dependencies]
 structopt = "0.3.8"
 hex-literal = "0.3.1"
-jsonrpc-core = "15.1.0"
-# Substrate primitives
+jsonrpc-core = "18.0.0"
+log = "0.4.14"
+# Substrate client
 sc-cli = { path = "../../substrate/client/cli", features = ["wasmtime"] }
-sp-core = { path = "../../substrate/primitives/core" }
 sc-executor = { path = "../../substrate/client/executor", features = ["wasmtime"] }
 sc-service = { path = "../../substrate/client/service", features = ["wasmtime"] }
 sc-telemetry = { path = "../../substrate/client/telemetry" }
 sc-keystore = { path = "../../substrate/client/keystore" }
-sp-inherents = { path = "../../substrate/primitives/inherents" }
 sc-transaction-pool = { path = "../../substrate/client/transaction-pool" }
+sc-transaction-pool-api = { version = "4.0.0-dev", path = "../../substrate/client/transaction-pool/api" }
+# Substrate primitives
+sp-core = { path = "../../substrate/primitives/core" }
+sp-inherents = { path = "../../substrate/primitives/inherents" }
 sp-transaction-pool = { path = "../../substrate/primitives/transaction-pool" }
 sc-consensus-aura = { path = "../../substrate/client/consensus/aura" }
 sp-consensus-aura = { path = "../../substrate/primitives/consensus/aura" }
@@ -38,6 +41,7 @@ sp-finality-grandpa = { path = "../../substrate/primitives/finality-grandpa" }
 sc-client-api = { path = "../../substrate/client/api" }
 sp-runtime = { path = "../../substrate/primitives/runtime" }
 sp-keystore = { path = "../../substrate/primitives/keystore" }
+sp-timestamp = { path = "../../substrate/primitives/timestamp" }
 # These dependencies are used for the node template's RPCs
 sc-rpc = { path = "../../substrate/client/rpc" }
 sp-api = { path = "../../substrate/primitives/api" }
@@ -47,6 +51,9 @@ sp-block-builder = { path = "../../substrate/primitives/block-builder" }
 sc-basic-authorship = { path = "../../substrate/client/basic-authorship" }
 substrate-frame-rpc-system = { path = "../../substrate/utils/frame/rpc/system" }
 pallet-transaction-payment-rpc = { path = "../../substrate/frame/transaction-payment/rpc/" }
+# FRAME Benchmarking
+frame-benchmarking = { path = "../../substrate/frame/benchmarking" }
+frame-benchmarking-cli = { path = "../../substrate/utils/frame/benchmarking-cli" }
 # The actual runtime
 wika-runtime = { path = "../runtime" }
 
@@ -55,4 +62,6 @@ substrate-build-script-utils = { path = "../../substrate/utils/build-script-util
 
 [features]
 default = []
-
+runtime-benchmarks = [
+	"wika-runtime/runtime-benchmarks",
+]

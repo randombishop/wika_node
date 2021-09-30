@@ -42,7 +42,7 @@ pub use sp_runtime::{Perbill, Permill};
 
 
 //==========WIKA-EDIT-START==========
-use codec::Encode;
+use parity_scale_codec::Encode;
 use sp_runtime::SaturatedConversion;
 use sp_runtime::MultiSigner;
 use frame_system::offchain::AppCrypto ;

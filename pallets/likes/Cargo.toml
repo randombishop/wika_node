@@ -14,7 +14,8 @@ targets = ['x86_64-unknown-linux-gnu']
 
 [dependencies]
 # external dependencies
-parity-scale-codec = {default-features = false, features = ['derive'], package = 'parity-scale-codec', version = '2.0.0'}
+parity-scale-codec = {version = '2.3.1', default-features = false, features = ['derive']}
+scale-info = { version = "1.0", default-features = false, features = ["derive"] }
 log = { version = "0.4.14", default-features = false }
 # Substrate dependencies
 frame-support = { default-features = false, path = '../../../substrate/frame/support' }
@@ -30,11 +31,14 @@ wika-traits = { default-features = false, path = '../../libs/traits' }
 default = ['std']
 std = [
     'parity-scale-codec/std',
+    'scale-info/std',
+
     'frame-support/std',
     'frame-system/std',
     'sp-std/std',
     'sp-io/std',
     'sp-runtime/std',
+
     'wika-traits/std',
     'log/std'
 ]

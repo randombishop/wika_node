@@ -12,9 +12,11 @@ targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
 # General
-codec = { package = "parity-scale-codec", version = "2.2.0", default-features = false, features = ["derive"] }
+parity-scale-codec = {version = '2.3.1', default-features = false, features = ['derive']}
+scale-info = { version = "1.0", default-features = false, features = ["derive"] }
 serde = { version = "1.0.101", optional = true, features = ["derive"] }
 log = { version = "0.4.14", default-features = false }
+hex-literal = { version = "0.3.3", optional = true }
 # Substrate primitives
 sp-api = { default-features = false, path = "../../substrate/primitives/api" }
 sp-block-builder = { default-features = false, path = "../../substrate/primitives/block-builder" }
@@ -45,7 +47,6 @@ pallet-transaction-payment-rpc-runtime-api = { default-features = false, path = 
 # Benchmarking
 frame-benchmarking = { default-features = false, path = "../../substrate/frame/benchmarking", optional = true }
 frame-system-benchmarking = { default-features = false, path = "../../substrate/frame/system/benchmarking", optional = true }
-hex-literal = { version = "0.3.1", optional = true }
 # Wika libs and pallets
 wika-traits = { default-features = false, path = '../libs/traits' }
 pallet-authorities = { default-features = false, path = "../pallets/authorities" }
@@ -58,7 +59,8 @@ substrate-wasm-builder = { path = "../../substrate/utils/wasm-builder" }
 [features]
 default = ["std"]
 std = [
-	"codec/std",
+	"parity-scale-codec/std",
+	'scale-info/std',
 	"serde/std",
     "log/std",
 

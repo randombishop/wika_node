@@ -216,19 +216,18 @@ fn fetch_from_url(url: &Vec<u8>) -> Option<Vec<u8>> {
 	}
 	let pending = pending.unwrap() ;
 
-	// The returning value here is a `Result` of `Result`,
+	// Wait for the response
 	let response = pending.try_wait(timeout) ;
-
-	// Unwrap twice
 	if response.is_err() {
-		log::debug!(target: "OWNERS", "fetch_from_url failed to wait for the response");
+		log::debug!(target: "OWNERS", "fetch_from_url try_wait failed: {:?}", response);
 		return None ;
 	}
 	let response = response.unwrap() ;
 	log::debug!(target: "OWNERS", "fetch_from_url response: {:?}", response);
 
+    // Response is actually a Result, need to unwrap again
 	if response.is_err() {
-		log::debug!(target: "OWNERS", "fetch_from_url failed to fetch the response");
+	    log::debug!(target: "OWNERS", "fetch_from_url response is_err()");
 		return None ;
 	}
 	let response = response.unwrap() ;
@@ -749,7 +748,7 @@ impl<T: Config> Module<T> {
 
 		// Submit the commit transaction
 		let signer = Signer::<T, T::OwnersAppCrypto>::any_account();
-		let result = signer.send_signed_transaction(|_acct| Call::commit_verification(url.clone(), commit_hash.clone()));
+		let result = signer.send_signed_transaction(|_acct| { Call::commit_verification {url: url.clone(), hash: commit_hash.clone()} });
 		if let Some((acc, res)) = result {
 			if res.is_err() {
 				log::error!(target: "OWNERS", "send_commit_offchain TRANSACTION FAILED. account id: {:?}", acc.id);
@@ -794,11 +793,13 @@ impl<T: Config> Module<T> {
 
 		// Submit the reveal transaction
 		let result = signer.send_signed_transaction(|_acct| {
-			Call::reveal_verification(url.clone(),
-									  vote,
-									  intro.clone(),
-									  proof.clone(),
-									  salt.clone())
+			Call::reveal_verification {
+                url: url.clone(),
+                vote: vote,
+                intro: intro.clone(),
+                proof: proof.clone(),
+                salt: salt.clone()
+		    }
 		});
 		if let Some((acc, res)) = result {
 			if res.is_err() {

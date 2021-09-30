@@ -42,16 +42,15 @@ curl http://localhost:9933 -H "Content-Type:application/json;charset=utf-8" -d "
 
 # Start a test node
 ```
-nohup ./target/release/wika-node \
-    --public-addr /ip4/$NODE_IP \
-    --base-path /var/db_wika/$NODE_NAME \
+./target/release/wika-node \
+    --public-addr /ip4/x.x.x.x \
+    --base-path /var/db_wika/test1 \
     --validator \
     --telemetry-url 'wss://telemetry.polkadot.io/submit/ 0' \
-    --name $NODE_NAME \
-    --chain $CHAIN_NAME \
-    --port $CHAIN_PORT \
-    --ws-port $WS_PORT \
-    --rpc-port $RPC_PORT \
-    $BOOT_NODE_OPTION \
-    >/var/log/wikanode.log  &
+    --name test1 \
+    --chain test \
+    --port 30334 \
+    --ws-port 9944 \
+    --rpc-port 9934 \
+    --bootnodes /ip4/z.z.z.z/tcp/30334/p2p/xyz
 ```

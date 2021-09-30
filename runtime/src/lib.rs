@@ -204,9 +204,14 @@ impl frame_system::Config for Runtime {
 
 impl pallet_randomness_collective_flip::Config for Runtime {}
 
+parameter_types! {
+	pub const MaxAuthorities: u32 = 32;
+}
+
 impl pallet_aura::Config for Runtime {
 	type AuthorityId = AuraId;
 	type DisabledValidators = ();
+	type MaxAuthorities = MaxAuthorities;
 }
 
 impl pallet_grandpa::Config for Runtime {
@@ -226,6 +231,7 @@ impl pallet_grandpa::Config for Runtime {
 	type HandleEquivocation = ();
 
 	type WeightInfo = ();
+	type MaxAuthorities = MaxAuthorities;
 }
 
 parameter_types! {
@@ -380,20 +386,6 @@ impl pallet_likes::Config for Runtime {
 
 //==========WIKA-EDIT-STOP===========
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime where
@@ -410,12 +402,11 @@ construct_runtime!(
 		TransactionPayment: pallet_transaction_payment::{Pallet, Storage},
 		Sudo: pallet_sudo::{Pallet, Call, Config<T>, Storage, Event<T>},
 
-        //==========WIKA-EDIT-START==========
+		//==========WIKA-EDIT-START==========
         Authorities: pallet_authorities::{Pallet, Call, Storage, Config, Event<T>},
         Likes: pallet_likes::{Pallet, Call, Storage, Event<T>},
 		Owners: pallet_owners::{Pallet, Call, Storage, Event<T>}
 		//==========WIKA-EDIT-STOP===========
-
 	}
 );
 
@@ -463,7 +454,7 @@ impl_runtime_apis! {
 
 	impl sp_api::Metadata<Block> for Runtime {
 		fn metadata() -> OpaqueMetadata {
-			Runtime::metadata().into()
+			OpaqueMetadata::new(Runtime::metadata().into())
 		}
 	}
 
@@ -510,8 +501,8 @@ impl_runtime_apis! {
 		}
 
 		fn authorities() -> Vec<AuraId> {
-			//===WIKA-REPLACEMENT
-			//Aura::authorities()
+		    //===WIKA-REPLACEMENT
+			//Aura::authorities().into_inner()
 			Authorities::list_aura()
 		}
 	}
@@ -530,7 +521,7 @@ impl_runtime_apis! {
 
 	impl fg_primitives::GrandpaApi<Block> for Runtime {
 		fn grandpa_authorities() -> GrandpaAuthorityList {
-			//===WIKA-REPLACEMENT
+		    //===WIKA-REPLACEMENT
 			//Grandpa::grandpa_authorities()
 			Authorities::list_grandpa()
 		}

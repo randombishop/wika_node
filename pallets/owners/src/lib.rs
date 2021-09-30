@@ -119,11 +119,15 @@ const INTRO_LENGTH: usize = 128 ;
 
 const MARK_LENGTH: usize = 128 ;
 
-const FETCH_TIMEOUT_PERIOD: u64 = 5000 ;
+const FETCH_TIMEOUT_PERIOD: u64 = 15000 ;
 
 const MARK_PREFIX: &str  = "wika.network/author/" ;
 
 const REVEAL_QUEUE_PREFIX: &[u8] = b"ownr/r/";
+
+const USER_AGENT: &str  = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36" ;
+
+const ACCEPT_HEADER: &str = "text/html,application/xhtml+xml,application/xml" ;
 
 //const OFFCHAIN_CACHE_LOCK_TIMEOUT_MS: u64 = 250 ;
 
@@ -201,9 +205,9 @@ fn fetch_from_url(url: &Vec<u8>) -> Option<Vec<u8>> {
 
 	// Sending the request
 	let pending = request
-	    .add_header("Accept", "text/html")
-	    .add_header("Host", "node.wika.network")
-	    .add_header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:91.0) Gecko/20100101 Firefox/91.0")
+	    .add_header("Accept", ACCEPT_HEADER)
+	    .add_header("Connection", "close")
+		.add_header("User-Agent", USER_AGENT)
 		.deadline(timeout)
 		.send() ;
 	if pending.is_err() {
@@ -221,6 +225,8 @@ fn fetch_from_url(url: &Vec<u8>) -> Option<Vec<u8>> {
 		return None ;
 	}
 	let response = response.unwrap() ;
+	log::debug!(target: "OWNERS", "fetch_from_url response: {:?}", response);
+
 	if response.is_err() {
 		log::debug!(target: "OWNERS", "fetch_from_url failed to fetch the response");
 		return None ;

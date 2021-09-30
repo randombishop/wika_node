@@ -21,15 +21,15 @@ git clone -b monthly-2021-09 https://github.com/paritytech/substrate.git
 ```
 
 4. Compile it
-Should take 15 minutes or more, be patient and hope for the best.
+Should take 20 minutes or more, be patient and hope for the best.
 ```
-cargo build
+cargo build --release
 ```
 
 
 # Run locally for development
 ```
-./target/debug/wika-node --tmp --dev -lOWNERS=debug -lLIKE=debug
+./target/release/wika-node --tmp --dev -lOWNERS=debug -lLIKE=debug
 ```
 
 # Enabling offchain worker with Alice as a verifier

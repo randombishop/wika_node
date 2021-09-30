@@ -16,7 +16,7 @@ targets = ['x86_64-unknown-linux-gnu']
 
 [dependencies]
 # external dependencies
-parity-scale-codec = {default-features = false, features = ['derive'], package = 'parity-scale-codec', version = '2.0.0'}
+parity-scale-codec = {default-features = false, features = ['derive'], package = 'parity-scale-codec', version = '2.2.0'}
 hex = { version = '0.4', default-features = false}
 numtoa = { version = '0.2.4', default-features = false}
 log = { version = "0.4.14", default-features = false }

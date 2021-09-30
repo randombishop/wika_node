@@ -14,10 +14,10 @@ RUN /root/.cargo/bin/rustup update nightly
 RUN /root/.cargo/bin/rustup target add wasm32-unknown-unknown --toolchain nightly
 ```
 
-3. Git clone substrate repo at the same root as this repo (side by side)
-Current compatible tag is `monthly-2021-09`
+3. Git clone substrate repo and wika_node repo side by side
+Current substrate repo compatible tag is `0a785f1221f5d143ae4487147183d66bad0f9837`
 ```
-git clone -b monthly-2021-09 https://github.com/paritytech/substrate.git
+git clone -b 0a785f1221f5d143ae4487147183d66bad0f9837 https://github.com/paritytech/substrate.git
 ```
 
 4. Compile it

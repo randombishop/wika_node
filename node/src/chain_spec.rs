@@ -212,25 +212,25 @@ fn wika_genesis(
 	_enable_println: bool,
 ) -> GenesisConfig {
 	GenesisConfig {
-		frame_system: Some(SystemConfig {
+		system: SystemConfig {
 			// Add Wasm runtime to storage.
 			code: wasm_binary.to_vec(),
 			changes_trie_config: Default::default(),
-		}),
-		pallet_balances: Some(BalancesConfig {
+		},
+		balances: BalancesConfig {
 			balances: endowed_accounts.iter().cloned().map(|k|(k, INITIAL_AUTHORITIES_BALANCE)).collect(),
-		}),
-		pallet_aura: Some(AuraConfig {
+		},
+		aura: AuraConfig {
 			authorities: vec![],
-		}),
-		pallet_grandpa: Some(GrandpaConfig {
+		},
+		grandpa: GrandpaConfig {
 			authorities: vec![],
-		}),
-		pallet_sudo: Some(SudoConfig {
+		},
+		sudo: SudoConfig {
 			key: root_key,
-		}),
-		pallet_authorities: Some(AuthoritiesConfig {
+		},
+		authorities: AuthoritiesConfig {
 			keys: initial_authorities.clone(),
-		}),
+		},
 	}
 }

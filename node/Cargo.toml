@@ -18,44 +18,47 @@ name = "wika-node"
 [dependencies]
 structopt = "0.3.8"
 hex-literal = "0.3.1"
-
-sc-cli = { version = "0.9.0", path = "../../substrate/client/cli", features = ["wasmtime"] }
-sp-core = { version = "3.0.0", path = "../../substrate/primitives/core" }
-sc-executor = { version = "0.9.0", path = "../../substrate/client/executor", features = ["wasmtime"] }
-sc-service = { version = "0.9.0", path = "../../substrate/client/service", features = ["wasmtime"] }
-sc-telemetry = { version = "3.0.0", path = "../../substrate/client/telemetry" }
-sc-keystore = { version = "3.0.0", path = "../../substrate/client/keystore" }
-sp-inherents = { version = "3.0.0", path = "../../substrate/primitives/inherents" }
-sc-transaction-pool = { version = "3.0.0", path = "../../substrate/client/transaction-pool" }
-sp-transaction-pool = { version = "3.0.0", path = "../../substrate/primitives/transaction-pool" }
-sc-consensus-aura = { version = "0.9.0", path = "../../substrate/client/consensus/aura" }
-sp-consensus-aura = { version = "0.9.0", path = "../../substrate/primitives/consensus/aura" }
-sp-consensus = { version = "0.9.0", path = "../../substrate/primitives/consensus/common" }
-sc-consensus = { version = "0.9.0", path = "../../substrate/client/consensus/common" }
-sc-finality-grandpa = { version = "0.9.0", path = "../../substrate/client/finality-grandpa" }
-sp-finality-grandpa = { version = "3.0.0", path = "../../substrate/primitives/finality-grandpa" }
-sc-client-api = { version = "3.0.0", path = "../../substrate/client/api" }
-sp-runtime = { version = "3.0.0", path = "../../substrate/primitives/runtime" }
-sp-keystore = { version = "0.9.0", path = "../../substrate/primitives/keystore" }
+jsonrpc-core = "18.0.0"
+log = "0.4.14"
+# Substrate client
+sc-cli = { path = "../../substrate/client/cli", features = ["wasmtime"] }
+sc-executor = { path = "../../substrate/client/executor", features = ["wasmtime"] }
+sc-service = { path = "../../substrate/client/service", features = ["wasmtime"] }
+sc-telemetry = { path = "../../substrate/client/telemetry" }
+sc-keystore = { path = "../../substrate/client/keystore" }
+sc-transaction-pool = { path = "../../substrate/client/transaction-pool" }
+sc-transaction-pool-api = { version = "4.0.0-dev", path = "../../substrate/client/transaction-pool/api" }
+# Substrate primitives
+sp-core = { path = "../../substrate/primitives/core" }
+sp-inherents = { path = "../../substrate/primitives/inherents" }
+sp-transaction-pool = { path = "../../substrate/primitives/transaction-pool" }
+sc-consensus-aura = { path = "../../substrate/client/consensus/aura" }
+sp-consensus-aura = { path = "../../substrate/primitives/consensus/aura" }
+sp-consensus = { path = "../../substrate/primitives/consensus/common" }
+sc-consensus = { path = "../../substrate/client/consensus/common" }
+sc-finality-grandpa = { path = "../../substrate/client/finality-grandpa" }
+sp-finality-grandpa = { path = "../../substrate/primitives/finality-grandpa" }
+sc-client-api = { path = "../../substrate/client/api" }
+sp-runtime = { path = "../../substrate/primitives/runtime" }
+sp-keystore = { path = "../../substrate/primitives/keystore" }
+sp-timestamp = { path = "../../substrate/primitives/timestamp" }
 # These dependencies are used for the node template's RPCs
-jsonrpc-core = "15.1.0"
-sc-rpc = { version = "3.0.0", path = "../../substrate/client/rpc" }
-sp-api = { version = "3.0.0", path = "../../substrate/primitives/api" }
-sc-rpc-api = { version = "0.9.0", path = "../../substrate/client/rpc-api" }
-sp-blockchain = { version = "3.0.0", path = "../../substrate/primitives/blockchain" }
-sp-block-builder = { version = "3.0.0", path = "../../substrate/primitives/block-builder" }
-sc-basic-authorship = { version = "0.9.0", path = "../../substrate/client/basic-authorship" }
-substrate-frame-rpc-system = { version = "3.0.0", path = "../../substrate/utils/frame/rpc/system" }
-pallet-transaction-payment-rpc = { version = "3.0.0", path = "../../substrate/frame/transaction-payment/rpc/" }
-
-# These dependencies are used for runtime benchmarking
-frame-benchmarking = { version = "3.0.0", path = "../../substrate/frame/benchmarking" }
-frame-benchmarking-cli = { version = "3.0.0", path = "../../substrate/utils/frame/benchmarking-cli" }
-
-wika-runtime = { version = "2.0.0", path = "../runtime" }
+sc-rpc = { path = "../../substrate/client/rpc" }
+sp-api = { path = "../../substrate/primitives/api" }
+sc-rpc-api = { path = "../../substrate/client/rpc-api" }
+sp-blockchain = { path = "../../substrate/primitives/blockchain" }
+sp-block-builder = { path = "../../substrate/primitives/block-builder" }
+sc-basic-authorship = { path = "../../substrate/client/basic-authorship" }
+substrate-frame-rpc-system = { path = "../../substrate/utils/frame/rpc/system" }
+pallet-transaction-payment-rpc = { path = "../../substrate/frame/transaction-payment/rpc/" }
+# FRAME Benchmarking
+frame-benchmarking = { path = "../../substrate/frame/benchmarking" }
+frame-benchmarking-cli = { path = "../../substrate/utils/frame/benchmarking-cli" }
+# The actual runtime
+wika-runtime = { path = "../runtime" }
 
 [build-dependencies]
-substrate-build-script-utils = { version = "3.0.0", path = "../../substrate/utils/build-script-utils" }
+substrate-build-script-utils = { path = "../../substrate/utils/build-script-utils" }
 
 [features]
 default = []

@@ -201,6 +201,9 @@ fn fetch_from_url(url: &Vec<u8>) -> Option<Vec<u8>> {
 
 	// Sending the request
 	let pending = request
+	    .add_header("Accept", "text/html")
+	    .add_header("Host", "node.wika.network")
+	    .add_header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:91.0) Gecko/20100101 Firefox/91.0")
 		.deadline(timeout)
 		.send() ;
 	if pending.is_err() {

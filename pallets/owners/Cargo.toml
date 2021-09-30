@@ -9,6 +9,8 @@ readme = 'README.md'
 repository = 'https://github.com/randombishop/wika_node'
 version = '3.0.0'
 
+
+
 [package.metadata.docs.rs]
 targets = ['x86_64-unknown-linux-gnu']
 

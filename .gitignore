@@ -6,8 +6,6 @@
 
 .DS_Store
 
-# Cargo lock
-Cargo.lock
 
 # exclude PyCharm metadata
 .idea

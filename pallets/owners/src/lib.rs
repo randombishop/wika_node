@@ -206,7 +206,6 @@ fn fetch_from_url(url: &Vec<u8>) -> Option<Vec<u8>> {
 	// Sending the request
 	let pending = request
 	    .add_header("Accept", ACCEPT_HEADER)
-	    .add_header("Connection", "close")
 		.add_header("User-Agent", USER_AGENT)
 		.deadline(timeout)
 		.send() ;
@@ -748,7 +747,7 @@ impl<T: Config> Module<T> {
 
 		// Submit the commit transaction
 		let signer = Signer::<T, T::OwnersAppCrypto>::any_account();
-		let result = signer.send_signed_transaction(|_acct| { Call::commit_verification {url: url.clone(), hash: commit_hash.clone()} });
+		let result = signer.send_signed_transaction(|_acct| { Call::commit_verification (url.clone(), commit_hash.clone()) });
 		if let Some((acc, res)) = result {
 			if res.is_err() {
 				log::error!(target: "OWNERS", "send_commit_offchain TRANSACTION FAILED. account id: {:?}", acc.id);
@@ -793,13 +792,13 @@ impl<T: Config> Module<T> {
 
 		// Submit the reveal transaction
 		let result = signer.send_signed_transaction(|_acct| {
-			Call::reveal_verification {
-                url: url.clone(),
-                vote: vote,
-                intro: intro.clone(),
-                proof: proof.clone(),
-                salt: salt.clone()
-		    }
+			Call::reveal_verification(
+                url.clone(),
+                vote,
+                intro.clone(),
+                proof.clone(),
+                salt.clone()
+		    )
 		});
 		if let Some((acc, res)) = result {
 			if res.is_err() {

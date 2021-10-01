@@ -21,11 +21,11 @@ rustup target add wasm32-unknown-unknown --toolchain nightly
 ```
 
 3. Git clone substrate 
-Current substrate repo compatible tag is `0a785f1221f5d143ae4487147183d66bad0f9837`
+Current substrate repo compatible tag is `monthly-2021-08`
 ```
 git clone https://github.com/paritytech/substrate.git
 cd substrate
-git checkout 0a785f1221f5d143ae4487147183d66bad0f9837
+git checkout monthly-2021-08
 cd ..
 ```
 

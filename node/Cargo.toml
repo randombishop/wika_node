@@ -18,7 +18,7 @@ name = "wika-node"
 [dependencies]
 structopt = "0.3.8"
 hex-literal = "0.3.1"
-jsonrpc-core = "18.0.0"
+jsonrpc-core = "15.1.0"
 log = "0.4.14"
 # Substrate client
 sc-cli = { path = "../../substrate/client/cli", features = ["wasmtime"] }

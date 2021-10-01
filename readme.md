@@ -1,28 +1,43 @@
 # Install locally
 
-1. Install rust
+
+
+1. Follow substrate documentation to install dependencies (do #1 only) 
+https://substrate.dev/docs/en/knowledgebase/getting-started/
+2. For example, in apt world
 ```
-curl https://sh.rustup.rs -sSf > sh.rustup.rs
-sh sh.rustup.rs -y
+sudo apt update
+sudo apt install -y git clang curl libssl-dev llvm libudev-dev
 ```
 
-2. Setup rust
+2. Install and detup rust
 ```
-RUN /root/.cargo/bin/rustup default stable
-RUN /root/.cargo/bin/rustup update
-RUN /root/.cargo/bin/rustup update nightly
-RUN /root/.cargo/bin/rustup target add wasm32-unknown-unknown --toolchain nightly
+curl https://sh.rustup.rs -sSf | sh
+source ~/.cargo/env
+rustup default stable
+rustup update
+rustup update nightly
+rustup target add wasm32-unknown-unknown --toolchain nightly
 ```
 
-3. Git clone substrate repo and wika_node repo side by side
+3. Git clone substrate 
 Current substrate repo compatible tag is `0a785f1221f5d143ae4487147183d66bad0f9837`
 ```
-git clone -b 0a785f1221f5d143ae4487147183d66bad0f9837 https://github.com/paritytech/substrate.git
+git clone https://github.com/paritytech/substrate.git
+cd substrate
+git checkout 0a785f1221f5d143ae4487147183d66bad0f9837
+cd ..
 ```
 
-4. Compile it
-Should take 20 minutes or more, be patient and hope for the best.
+4. Git clone wika-node side by side with substrate
 ```
+git clone https://github.com/randombishop/wika_node.git
+```
+
+5. Compile it
+Should take 20 minutes to 1 hour depending on your number of CPUs, also note that a minimum of 4Gb of RAM is required here.
+```
+cd wika_node
 cargo build --release
 ```
 

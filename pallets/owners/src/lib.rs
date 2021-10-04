@@ -292,15 +292,16 @@ impl OffchainCache {
 
 	fn add_reveal_to_existing_list(key: &[u8], item: RevealItem) {
 		let cache = StorageValueRef::persistent(key) ;
-		let update = cache.mutate(|status: Result<Option<Option<Vec<RevealItem>>>,StorageRetrievalError>| {
+		let update = cache.mutate(|status: Result<Option<Vec<RevealItem>>,StorageRetrievalError>| {
 			if status.is_ok() {
 			    let o = status.unwrap() ;
-			    if let Some(Some(mut list)) = o {
-                    list.push(item) ;
-                    return Ok(Some(list)) ;
-                } else {
-                    return Err(()) ;
-                }
+			    if o.is_some() {
+			        let mut list = o.unwrap() ;
+			        list.push(item) ;
+                    return Ok(list) ;
+			    } else {
+			        return Err(()) ;
+			    }
 			} else {
 			    return Err(()) ;
 			}
@@ -328,9 +329,14 @@ impl OffchainCache {
 
 		// Save to new list or add to existing one
 		let cache = StorageValueRef::persistent(&key);
-		let cache_get = cache.get::<Vec<bool>>() ;
+		let cache_get: Result<Option<Vec<RevealItem>>,StorageRetrievalError> = cache.get::<Vec<RevealItem>>() ;
 		if cache_get.is_ok() {
-			Self::add_reveal_to_existing_list(&key, reveal) ;
+		    let cache_get = cache_get.unwrap() ;
+		    if cache_get.is_some() {
+		        Self::add_reveal_to_existing_list(&key, reveal) ;
+		    } else {
+		        Self::add_reveal_to_new_list(&key, reveal) ;
+		    }
 		} else {
 			Self::add_reveal_to_new_list(&key, reveal) ;
 		}
@@ -340,10 +346,11 @@ impl OffchainCache {
 		let key = Self::key_reveals_at_block(block_number) ;
 		log::debug!(target: "OWNERS", "OffchainCache take_reveal_list key: {:?}", sp_std::str::from_utf8(&key));
 		let cache = StorageValueRef::persistent(&key) ;
-		let cache_get = cache.get::<Vec<RevealItem>>() ;
+		let cache_get: Result<Option<Vec<RevealItem>>,StorageRetrievalError> = cache.get::<Vec<RevealItem>>() ;
 		if cache_get.is_ok() {
-		    if let Some(list) = cache_get.unwrap() {
-		        return list ;
+		    let cache_get = cache_get.unwrap() ;
+		    if cache_get.is_some() {
+		        return cache_get.unwrap() ;
 		    } else {
 		        return sp_std::vec![] ;
 		    }
@@ -736,7 +743,7 @@ impl<T: Config> Module<T> {
 
 		// Check that it's still time to commit
 		let current_block = Self::current_block_number() ;
-		log::error!(target: "OWNERS", "send_commit_offchain current_block: {:?}", current_block);
+		log::debug!(target: "OWNERS", "send_commit_offchain current_block: {:?}", current_block);
 		let param = u8_to_block::<T>(NumBlocksToCommit::get()) ;
 		let max_block = requested_at + param ;
 		if current_block>=max_block {

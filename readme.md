@@ -38,12 +38,16 @@ git clone https://github.com/randombishop/wika_node.git
 Should take 20 minutes to 1 hour depending on your number of CPUs, also note that a minimum of 4Gb of RAM is required here.
 ```
 cd wika_node
+cargo build
+or
 cargo build --release
 ```
 
 
 # Run locally for development
 ```
+./target/debug/wika-node --tmp --dev -lOWNERS=debug -lLIKE=debug
+or
 ./target/release/wika-node --tmp --dev -lOWNERS=debug -lLIKE=debug
 ```
 

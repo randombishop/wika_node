@@ -1,0 +1,3 @@
+curl http://localhost:9934 -H "Content-Type:application/json;charset=utf-8" -d "@./aura.json"
+curl http://localhost:9934 -H "Content-Type:application/json;charset=utf-8" -d "@./gran.json"
+curl http://localhost:9934 -H "Content-Type:application/json;charset=utf-8" -d "@./ownr.json"

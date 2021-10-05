@@ -10,7 +10,7 @@ sudo apt update
 sudo apt install -y git clang curl libssl-dev llvm libudev-dev
 ```
 
-2. Install and detup rust
+2. Install and setup rust
 ```
 curl https://sh.rustup.rs -sSf | sh
 source ~/.cargo/env
@@ -38,12 +38,16 @@ git clone https://github.com/randombishop/wika_node.git
 Should take 20 minutes to 1 hour depending on your number of CPUs, also note that a minimum of 4Gb of RAM is required here.
 ```
 cd wika_node
+cargo build
+or
 cargo build --release
 ```
 
 
 # Run locally for development
 ```
+./target/debug/wika-node --tmp --dev -lOWNERS=debug -lLIKE=debug
+or
 ./target/release/wika-node --tmp --dev -lOWNERS=debug -lLIKE=debug
 ```
 
@@ -55,17 +59,13 @@ curl http://localhost:9933 -H "Content-Type:application/json;charset=utf-8" -d "
 2. Use the owners pallet addVerifier transaction to add Alice public key as a verifier.
 
 
-# Start a test node
+# Start a test node and join test net
 ```
 ./target/release/wika-node \
     --public-addr /ip4/x.x.x.x \
     --base-path /var/db_wika/test1 \
-    --validator \
     --telemetry-url 'wss://telemetry.polkadot.io/submit/ 0' \
-    --name test1 \
+    --name xyz1 \
     --chain test \
-    --port 30334 \
-    --ws-port 9944 \
-    --rpc-port 9934 \
     --bootnodes /ip4/z.z.z.z/tcp/30334/p2p/xyz
 ```

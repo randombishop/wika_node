@@ -59,13 +59,21 @@ curl http://localhost:9933 -H "Content-Type:application/json;charset=utf-8" -d "
 2. Use the owners pallet addVerifier transaction to add Alice public key as a verifier.
 
 
+
+# Generating a chain spec file
+(https://substrate.dev/docs/en/tutorials/start-a-private-network/customspec)
+```
+.target/release/wika-node  --chain test build-spec > specfile.json
+```
+
 # Start a test node and join test net
+(https://substrate.dev/docs/en/tutorials/start-a-private-network/customchain)
 ```
 ./target/release/wika-node \
     --public-addr /ip4/x.x.x.x \
     --base-path /var/db_wika/test1 \
     --telemetry-url 'wss://telemetry.polkadot.io/submit/ 0' \
     --name xyz1 \
-    --chain test \
+    --chain specfile.json \
     --bootnodes /ip4/z.z.z.z/tcp/30334/p2p/xyz
 ```

@@ -12,6 +12,3 @@
 
 # exlude tmp dir
 /tmp
-
-# exclude docker-compose.yaml
-docker-compose.yaml

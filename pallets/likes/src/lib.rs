@@ -57,7 +57,7 @@ decl_event! {
     pub enum Event<T> where
     		AccountId = <T as frame_system::Config>::AccountId {
         /// Event emitted when a like is processed. [who, url]
-        Liked(AccountId, Vec<u8>),
+        Liked(AccountId, Vec<u8>, u32),
     }
 }
 
@@ -344,7 +344,7 @@ decl_module! {
             }
 
             // Emit an event that the like was processed.
-            Self::deposit_event(RawEvent::Liked(sender, url));
+            Self::deposit_event(RawEvent::Liked(sender, url, num_likes));
         }
 
     }

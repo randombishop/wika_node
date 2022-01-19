@@ -46,6 +46,15 @@ jobs:
         rustup update stable
         rustup target add wasm32-unknown-unknown --toolchain nightly
 
+    - name: clone 
+      run: |
+        pushd ..
+        git clone https://github.com/paritytech/substrate.git
+        cd substrate
+        git checkout monthly-2021-08
+        cd ..
+        popd
+
     - name: Build
       run: cargo build --verbose --release
   # - name: Run tests

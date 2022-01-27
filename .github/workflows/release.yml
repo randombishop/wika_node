@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  repository_dispatch:
+    types: [tag-created]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    name: Build and release linux-amd64
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set-Up
+      run: sudo apt install -y cmake pkg-config libssl-dev git build-essential clang libclang-dev curl
+
+    - name: Install Rustup
+      run: |
+        curl https://sh.rustup.rs -sSf | sh -s -- -y
+        source ~/.cargo/env
+        rustup default stable
+        rustup update nightly
+        rustup update stable
+        rustup target add wasm32-unknown-unknown --toolchain nightly
+
+    - name: clone 
+      run: |
+        pushd ..
+        git clone https://github.com/paritytech/substrate.git
+        cd substrate
+        git checkout monthly-2021-08
+        cd ..
+        popd
+
+    - name: Build
+      run: cargo build --verbose --release
+
+    - name: Upload binary to release
+      uses: svenstaro/upload-release-action@v1-release
+      with:
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        file: target/release/wika-node
+        asset_name: wika-linux-amd64
+        tag: ${{ github.event.client_payload.new_version }}
+
+  

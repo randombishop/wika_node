@@ -398,7 +398,7 @@ decl_storage! {
     	// during which request data is persisted
     	// After this time, requests, commits and reveals
     	// are deleted
-    	NumBlocksToDelete: u8 = 25 ;
+    	NumBlocksToDelete: u8 = 100 ;
 
 		// Prct of identical reveals to validate a round of voting
     	PrctNeededForAgreement: u8 = 66 ;

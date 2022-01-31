@@ -947,7 +947,7 @@ decl_module! {
 			Self::aggregate_votes(current_block) ;
 			// Clean up history, requests, commits, reveals and results
 			Self::clean_up(current_block) ;
-			100_000
+			0
 		}
 
 		// Test Tx

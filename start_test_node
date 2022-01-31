@@ -1,0 +1,11 @@
+./target/release/wika-node \
+    --base-path ./tmp/test_net_data/ \
+    --telemetry-url 'wss://telemetry.polkadot.io/submit/ 0' \
+    --name local_test_node \
+    --chain=./chainspec/test.json \
+    --bootnodes /ip4/34.138.45.229/tcp/30333/p2p/12D3KooWRz54vjTij4MQyQgPC2fYdQDX86FKoVRwuDCevMLBwALf \
+    --rpc-cors=all \
+    --rpc-external \
+    --ws-external \
+
+

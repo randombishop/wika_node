@@ -878,7 +878,7 @@ impl<T: Config> Module<T> {
 		if prct>bar {
 			log::debug!(target: "OWNERS", "aggregate_votes_for_request votes are valid");
 			for (account, (r_vote, r_intro, r_proof)) in &reveals {
-				let mut stats = Verifiers::<T>::get(account) ;
+				let mut stats = Verifiers::<T>::take(account) ;
 				stats.6 += 1 ;
 				if *r_vote {
 					stats.7 += 1 ;
@@ -886,6 +886,8 @@ impl<T: Config> Module<T> {
 				if (r_vote, r_intro, r_proof) == (vote, intro, proof) {
 					stats.8 += 1 ;
 				}
+				Verifiers::<T>::insert(account, stats) ;
+				log::debug!(target: "OWNERS", "updated stats for account: {:?}", account);
 			}
 		}
 
@@ -900,6 +902,7 @@ impl<T: Config> Module<T> {
 			Owners::<T>::insert(&url, &owner) ;
 			// Emit an event that new ownership.
             Self::deposit_event(RawEvent::UrlOwnerRegistered(owner, url, block_to_u32::<T>(current_block)));
+            log::debug!(target: "OWNERS", "deposit_event(UrlOwnerRegistered)");
 		}
 		log::debug!(target: "OWNERS", "aggregate_votes_for_request DONE");
 	}

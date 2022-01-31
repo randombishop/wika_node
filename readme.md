@@ -94,11 +94,5 @@ or
 (<https://substrate.dev/docs/en/tutorials/start-a-private-network/customchain>)
 
 ```sh
-./target/release/wika-node \
-    --public-addr /ip4/x.x.x.x \
-    --base-path /var/db_wika/test1 \
-    --telemetry-url 'wss://telemetry.polkadot.io/submit/ 0' \
-    --name xyz1 \
-    --chain specfile.json \
-    --bootnodes /ip4/z.z.z.z/tcp/30334/p2p/xyz
+./start_test_node
 ```

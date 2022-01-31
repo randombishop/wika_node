@@ -152,26 +152,65 @@ fn block_to_u32<T:Config>(input: T::BlockNumber) -> u32 {
 	}
 }
 
-fn find_majority<K,V: Ord>(list: &Vec<(K, V)>) -> Option<(&V,u32)> {
+fn find_majority_vote<T:Config>(list: &Vec<(T::AccountId, (bool, Vec<u8>, Vec<u8>))>) -> (bool,u32) {
 	let mut map = BTreeMap::new() ;
-	for (_, v) in list {
-		let count: Option<&u32> = map.get(&v) ;
+	for (_, (vote,_,_)) in list {
+	    log::debug!(target: "OWNERS", "find_majority_vote vote: {:?}", vote);
+		let count: Option<&u32> = map.get(&vote) ;
+		log::debug!(target: "OWNERS", "find_majority_vote count: {:?}", count);
 		if count.is_none() {
-			map.insert(v, 1) ;
+			map.insert(vote, 1) ;
 		} else {
 			let update = count.unwrap() + 1 ;
-			map.insert(v, update) ;
+			map.insert(vote, update) ;
 		}
 	}
-	let majority = map
+	let (k,v) = map
 		.iter()
-		.max_by(|a, b| a.1.cmp(&b.1)) ;
-	if majority.is_none() {
-		return None ;
-	} else {
-		let (k,v) = majority.unwrap() ;
-		return Some((*k,*v)) ;
+		.max_by(|a, b| a.1.cmp(&b.1))
+		.unwrap() ;
+	return (**k,*v) ;
+}
+
+
+fn find_majority_intro<T:Config>(list: &Vec<(T::AccountId, (bool, Vec<u8>, Vec<u8>))>) -> &Vec<u8> {
+	let mut map = BTreeMap::new() ;
+	for (_, (_,intro,_)) in list {
+	    log::debug!(target: "OWNERS", "find_majority_intro intro: {:?}", sp_std::str::from_utf8(intro));
+		let count: Option<&u32> = map.get(&intro) ;
+		log::debug!(target: "OWNERS", "find_majority_intro count: {:?}", count);
+		if count.is_none() {
+			map.insert(intro, 1) ;
+		} else {
+			let update = count.unwrap() + 1 ;
+			map.insert(intro, update) ;
+		}
 	}
+	let (k,_) = map
+		.iter()
+		.max_by(|a, b| a.1.cmp(&b.1))
+		.unwrap() ;
+	return *k ;
+}
+
+fn find_majority_proof<T:Config>(list: &Vec<(T::AccountId, (bool, Vec<u8>, Vec<u8>))>) -> &Vec<u8> {
+	let mut map = BTreeMap::new() ;
+	for (_, (_,_,proof)) in list {
+	    log::debug!(target: "OWNERS", "find_majority_proof proof: {:?}", sp_std::str::from_utf8(proof));
+		let count: Option<&u32> = map.get(&proof) ;
+		log::debug!(target: "OWNERS", "find_majority_proof count: {:?}", count);
+		if count.is_none() {
+			map.insert(proof, 1) ;
+		} else {
+			let update = count.unwrap() + 1 ;
+			map.insert(proof, update) ;
+		}
+	}
+	let (k,_) = map
+		.iter()
+		.max_by(|a, b| a.1.cmp(&b.1))
+		.unwrap() ;
+	return *k ;
 }
 
 
@@ -845,10 +884,17 @@ impl<T: Config> Module<T> {
 		}
 
 		// Define majority
-		let majority = find_majority(&reveals).unwrap() ;
-		let ((vote, intro, proof), count_majority) = majority ;
-		log::debug!(target: "OWNERS", "aggregate_votes_for_request majority count_majority: {:?}", count_majority);
-		let prct: u32 = count_majority*100/total ;
+		log::debug!(target: "OWNERS", "aggregate_votes_for_request start some boring loops------------------------------------");
+		let (majority_vote, majority_count) = find_majority_vote::<T>(&reveals) ;
+        let majority_intro = find_majority_intro::<T>(&reveals) ;
+        let majority_proof = find_majority_proof::<T>(&reveals) ;
+        log::debug!(target: "OWNERS", "aggregate_votes_for_request done with boring loops-------------------------------------");
+		log::debug!(target: "OWNERS", "aggregate_votes_for_request majority_vote: {:?}", majority_vote);
+		log::debug!(target: "OWNERS", "aggregate_votes_for_request majority_count: {:?}", majority_count);
+		log::debug!(target: "OWNERS", "aggregate_votes_for_request majority_intro: {:?}", sp_std::str::from_utf8(majority_intro));
+		log::debug!(target: "OWNERS", "aggregate_votes_for_request majority_proof: {:?}", sp_std::str::from_utf8(majority_proof));
+
+		let prct: u32 = majority_count*100/total ;
 		log::debug!(target: "OWNERS", "aggregate_votes_for_request majority prct: {:?}", prct);
 
 		// Count number of yes votes
@@ -860,15 +906,18 @@ impl<T: Config> Module<T> {
 
 		// Save the results
 		let bar: u32 = PrctNeededForAgreement::get().into() ;
+		log::debug!(target: "OWNERS", "aggregate_votes_for_request bar: {:?}", bar);
 		let majority_min: u32 = MajorityMin::get().into() ;
-		let outcome = *vote && prct>bar && count_majority>=majority_min ;
+		log::debug!(target: "OWNERS", "aggregate_votes_for_request majority_min: {:?}", majority_min);
+		let outcome = majority_vote && prct>bar && majority_count>=majority_min ;
+		log::debug!(target: "OWNERS", "aggregate_votes_for_request outcome: {:?}", outcome);
 		let result: (T::BlockNumber, u32, u32, u32, &Vec<u8>, &Vec<u8>, bool) = (
 			Self::current_block_number(),
 			total,
 			count_yes,
-			count_majority,
-			intro,
-			proof,
+			majority_count,
+			majority_intro,
+			majority_proof,
 			outcome
 		) ;
 		Results::<T>::insert(&url, result) ;
@@ -883,7 +932,7 @@ impl<T: Config> Module<T> {
 				if *r_vote {
 					stats.7 += 1 ;
 				}
-				if (r_vote, r_intro, r_proof) == (vote, intro, proof) {
+				if (*r_vote == majority_vote) && (r_intro == majority_intro) && (r_proof == majority_proof) {
 					stats.8 += 1 ;
 				}
 				Verifiers::<T>::insert(account, stats) ;

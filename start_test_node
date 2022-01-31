@@ -7,5 +7,6 @@
     --rpc-cors=all \
     --rpc-external \
     --ws-external \
+    -lOWNERS=debug -lLIKE=debug \
 
 
